@@ -45,6 +45,7 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
   <button type="button" id="bn">🎵 תווים</button>
   <button type="button" id="bd">🥁 תופים</button>
   <button type="button" id="bb">🎼 תזמורת</button>
+  <button type="button" id="bo">🎻 פילהרמונית</button>
 </div>
 <div id="mix">
 <label id="tempoBox">קצב <b id="tempoVal">122</b>
@@ -78,6 +79,7 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
 פתיחת כף היד הכוללת קובעת את העוצמה של אותה יד.<br>
 במצב «🥁 תופים» פתיחת אצבע מקישה פעם אחת. ימין: קיק, סנייר, האט סגור, האט פתוח, קלאפ. שמאל: טום נמוך, טום אמצע, טום גבוה, קראש, קאובל.<br>
 במצב «🎼 תזמורת» כל אצבע מוסיפה כלי לגרוב של 122 BPM (אפשר 118–124 במחוון), שמונה תיבות Am–F–C–G: קיק על כל רבע, היי-האט על כל שישה-עשר, סנייר על 2 ו-4, ומילוי כל ארבעה תיבות. ימין: קצב, בס, פסנתר, גיטרה, מיתרים. שמאל: ליד, חליל, מרימבה, נשיפה, מקהלה. סגירה מורידה את הכלי, ופתיחת כף היד קובעת את עוצמת היד. מחוון «עוצמה» (ברירת מחדל גבוהה) חל על המחשב ועל הרמקולים בטלפון. הבחירה נשמרת בדפדפן.<br>
+במצב «🎻 פילהרמונית» נפתח קטע תזמורתי נפרד, כ־96 BPM (מחוון 90–100), שמונה תיבות Dm–Bb–F–C. ימין: כינורות I, כינורות II, ויולות, צ'לי, קונטרבס בפיציקטו. שמאל: חליל, אבוב, קרנות, חצוצרות, נבל וטימפני. אולם הקונצרטים מהדהד יותר מהתזמורת.<br>
 מחאו כפיים — קרבו את מרכזי שתי כפות הידיים — כדי להשהות את הנגינה, ומחאו שוב כדי להמשיך.<br>
 אחרי «התחל» מופיע קוד QR לכתובת הרמקול בטלפון. «השמע גם במחשב» (פעיל כברירת מחדל) קובע אם התווים נשמעים גם כאן.</div>
 <style>.keys{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap;justify-content:center}.keys div{width:76px;padding:10px 0;border-radius:10px;background:#1f2937;font-size:12px;line-height:1.25;transition:.1s}.keys div.on{background:#22c55e;color:#06210f;font-weight:bold;box-shadow:0 0 16px #22c55e}.keys div.hit{background:#f59e0b;color:#1c1003;font-weight:bold;box-shadow:0 0 16px #f59e0b}</style>
@@ -95,7 +97,8 @@ let masterPct=100;
 try{const savedMaster=parseInt(localStorage.getItem("handmusic-master"),10);if(savedMaster>=0&&savedMaster<=100)masterPct=savedMaster;}catch(e){}
 function masterLevel(){return typeof HM!=="undefined"&&HM.masterFromPercent?HM.masterFromPercent(masterPct):(Math.max(0,Math.min(100,masterPct))/100)*1.85;}
 function palmVol(h,op){return h?Math.min(1.45,0.72+0.73*op):0;}
-const MODES=["notes","drums","band"];
+const MODES=["notes","drums","band","orch"];
+function isGroove(m){return m==="band"||m==="orch";}
 let playMode="notes";
 try{const saved=localStorage.getItem("handmusic-mode");if(MODES.includes(saved))playMode=saved;}catch(e){}
 let clockOrigin=0,clockHold=false,clockPausedAt=0;
@@ -112,8 +115,9 @@ function audio(){ac=new AudioContext();master=ac.createGain();master.gain.value=
  if(typeof HM==="undefined"){castErr("מנוע הצליל לא נטען. רעננו את הדף.");return;}
  clockOrigin=Date.now();
  engine=HM.createEngine(ac,master,loopPos);
- if(playMode==="band")engine.setEnabled(true);
- setInterval(()=>{if(playMode==="band")broadcastSync();},2000);
+ if(engine.setArrangement)engine.setArrangement(playMode==="orch"?"orch":"band");
+ if(isGroove(playMode))engine.setEnabled(true);
+ setInterval(()=>{if(isGroove(playMode))broadcastSync();},2000);
 }
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const palm=h=>({x:(h[0].x+h[9].x)/2,y:(h[0].y+h[9].y)/2});
@@ -148,7 +152,7 @@ function sendState(conn){
   if(paused){conn.send({t:"stopAll"});return;}
   for(const k of["R","L"]){if(sentVol[k]!=null)conn.send({t:"vol",hand:k,v:sentVol[k]});
    if(playMode==="notes")voices[k].forEach((vc,j)=>{if(vc.on)conn.send({t:"noteOn",hand:k,i:j,freq:N[k][j][1],name:N[k][j][0]});});
-   if(playMode==="band"&&engine)for(let j=0;j<5;j++)if(engine.layerOn[k][j])conn.send({t:"layer",hand:k,i:j,on:1,name:HM.BAND[k][j]});}
+   if(isGroove(playMode)&&engine)for(let j=0;j<5;j++)if(engine.layerOn[k][j])conn.send({t:"layer",hand:k,i:j,on:1,name:(playMode==="orch"?HM.ORCH:HM.BAND)[k][j]});}
  }catch(e){castErr("שליחת המצב לרמקול נכשלה: "+(e&&e.message||e));}
 }
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=()=>res();s.onerror=()=>rej(new Error(src));document.head.appendChild(s);});}
@@ -229,7 +233,7 @@ function loop(){
    const close=s>0&&dist(palm(seen.R),palm(seen.L))<s*CLAP_RATIO,nowMs=performance.now();
    if(close&&!clapHeld&&nowMs-clapAt>=CLAP_MS){clapHeld=true;clapAt=nowMs;paused=!paused;
     if(paused){pauseClock();silence();broadcast({t:"pause"});broadcast({t:"stopAll"});}
-    else{resumeClock();sentVol.R=sentVol.L=null;if(engine&&playMode==="band")engine.setEnabled(true);broadcast({t:"resume"});broadcastSync();}
+    else{resumeClock();sentVol.R=sentVol.L=null;if(engine&&isGroove(playMode))engine.setEnabled(true);broadcast({t:"resume"});broadcastSync();}
     showMode();}
    else if(!close)clapHeld=false;
   }
@@ -245,9 +249,10 @@ function loop(){
     for(const j of HM.risingHits(held[k],f,drumAt[k],hitNow,120)){drumAt[k][j]=hitNow;
      if(localOn&&engine)engine.triggerDrum(k,j,hv);flash(ui[k][j]);
      broadcast({t:"drum",hand:k,i:j,vol:hv,name:HM.DRUMS[k][j]});}}
-   else if(!paused&&playMode==="band"&&engine){const vol=palmVol(h,op);engine.setHand(k,localOn?vol:0);sendVol(k,vol);
+   else if(!paused&&isGroove(playMode)&&engine){const vol=palmVol(h,op);engine.setHand(k,localOn?vol:0);sendVol(k,vol);
+    const names=playMode==="orch"?HM.ORCH:HM.BAND;
     for(let j=0;j<5;j++){const on=!!f[j];if((engine.layerOn[k][j]?1:0)!==(on?1:0)){engine.setLayer(k,j,on);
-     ui[k][j].className=on?"on":"";broadcast({t:"layer",hand:k,i:j,on:on?1:0,name:HM.BAND[k][j]});}}}
+     ui[k][j].className=on?"on":"";broadcast({t:"layer",hand:k,i:j,on:on?1:0,name:names[k][j]});}}}
    for(let j=0;j<5;j++)held[k][j]=f[j]?1:0;
   }
   primed=true;
@@ -257,25 +262,37 @@ function loop(){
 const held={R:[0,0,0,0,0],L:[0,0,0,0,0]},drumAt={R:[0,0,0,0,0],L:[0,0,0,0,0]};
 let primed=false;
 function flash(el){el.classList.add("hit");setTimeout(()=>el.classList.remove("hit"),140);}
-function labelFor(k,i){if(playMode==="drums"&&typeof HM!=="undefined")return HM.DRUMS[k][i];if(playMode==="band"&&typeof HM!=="undefined")return HM.BAND[k][i];return N[k][i][0];}
+function labelFor(k,i){if(typeof HM==="undefined")return N[k][i][0];if(playMode==="drums")return HM.DRUMS[k][i];if(playMode==="band")return HM.BAND[k][i];if(playMode==="orch")return HM.ORCH[k][i];return N[k][i][0];}
 function applyLabels(){for(const k of["R","L"])ui[k].forEach((el,i)=>{el.innerHTML=FING[i]+"<br>"+labelFor(k,i);el.className="";});
- $("bn").classList.toggle("on",playMode==="notes");$("bd").classList.toggle("on",playMode==="drums");$("bb").classList.toggle("on",playMode==="band");}
+ $("bn").classList.toggle("on",playMode==="notes");$("bd").classList.toggle("on",playMode==="drums");$("bb").classList.toggle("on",playMode==="band");$("bo").classList.toggle("on",playMode==="orch");}
 function setPlayMode(m){if(!MODES.includes(m)||m===playMode)return;playMode=m;
  try{localStorage.setItem("handmusic-mode",m);}catch(e){}
- if(ac){silence();broadcast({t:"stopAll"});broadcast({t:"mode",mode:m});if(m==="band"&&engine&&!paused){engine.setEnabled(true);broadcastSync();}}
+ applyTempoUi();
+ if(ac){silence();if(engine&&engine.setArrangement)engine.setArrangement(m==="orch"?"orch":"band");broadcast({t:"stopAll"});broadcast({t:"mode",mode:m});if(isGroove(m)&&engine&&!paused){engine.setEnabled(true);broadcastSync();}}
  else if(typeof HM==="undefined"&&m!=="notes")castErr("מנוע הצליל לא נטען. רעננו את הדף.");
  applyLabels();}
+function tempoBounds(){return playMode==="orch"?{min:90,max:100,key:"handmusic-orch-bpm",fallback:96}:{min:118,max:124,key:"handmusic-bpm",fallback:122};}
+function applyTempoUi(){const b=tempoBounds();let n=b.fallback;
+ try{const s=parseInt(localStorage.getItem(b.key),10);if(s>=b.min&&s<=b.max)n=s;}catch(e){}
+ if($("tempo")){$("tempo").min=String(b.min);$("tempo").max=String(b.max);$("tempo").setAttribute("aria-label",playMode==="orch"?"קצב הפילהרמונית":"קצב התזמורת");}
+ if(typeof HM==="undefined")return;
+ const had=clockOrigin||clockHold;let idx=0;if(had)idx=loopPos()/HM.STEP;
+ HM.setBpm(n);
+ if(had){const pos=(idx%HM.STEPS)*HM.STEP;if(clockHold)clockPausedAt=pos;else clockOrigin=Date.now()-pos*1000;if(engine&&engine.realign)engine.realign();}
+ if($("tempo"))$("tempo").value=String(HM.BPM);
+ if($("tempoVal"))$("tempoVal").textContent=String(HM.BPM);}
 function setTempo(raw){if(typeof HM==="undefined"||!HM.setBpm)return;
- const next=Math.max(118,Math.min(124,Math.round(Number(raw)||122)));
+ const b=tempoBounds();
+ const next=Math.max(b.min,Math.min(b.max,Math.round(Number(raw)||b.fallback)));
  const had=clockOrigin||clockHold;let idx=0;
  if(had)idx=loopPos()/HM.STEP;
  HM.setBpm(next);
  if(had){const pos=(idx%HM.STEPS)*HM.STEP;if(clockHold)clockPausedAt=pos;else clockOrigin=Date.now()-pos*1000;if(engine&&engine.realign)engine.realign();}
  $("tempo").value=String(HM.BPM);$("tempoVal").textContent=String(HM.BPM);
- try{localStorage.setItem("handmusic-bpm",String(HM.BPM));}catch(e){}
+ try{localStorage.setItem(tempoBounds().key,String(HM.BPM));}catch(e){}
  if(ac)broadcastSync();}
-try{const savedBpm=parseInt(localStorage.getItem("handmusic-bpm"),10);if(savedBpm>=118&&savedBpm<=124&&typeof HM!=="undefined")HM.setBpm(savedBpm);}catch(e){}
-if($("tempo")&&typeof HM!=="undefined"){$("tempo").value=String(HM.BPM);$("tempoVal").textContent=String(HM.BPM);$("tempo").oninput=()=>setTempo($("tempo").value);}
+applyTempoUi();
+if($("tempo"))$("tempo").oninput=()=>setTempo($("tempo").value);
 function setMaster(raw){const n=Math.max(0,Math.min(100,Math.round(Number(raw)||0)));masterPct=n;
  $("masterVol").value=String(n);$("volVal").textContent=String(n);
  try{localStorage.setItem("handmusic-master",String(n));}catch(e){}
@@ -286,5 +303,6 @@ applyLabels();
 $("bn").onclick=()=>setPlayMode("notes");
 $("bd").onclick=()=>setPlayMode("drums");
 $("bb").onclick=()=>setPlayMode("band");
+$("bo").onclick=()=>setPlayMode("orch");
 </script>
 </body></html>

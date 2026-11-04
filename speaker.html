@@ -49,7 +49,7 @@ function takeClock(d,rtt){if(!d||typeof HM==="undefined")return;
  if(d.origin)origin=d.origin;
  if(d.paused){remotePaused=true;holdPos=d.pos||0;if(engine)engine.stopAll();return;}
  remotePaused=false;
- if(engine&&remoteMode==="band"){engine.setEnabled(true);engine.align(groovePos());}}
+ if(engine&&(remoteMode==="band"||remoteMode==="orch")){engine.setEnabled(true);engine.align(groovePos());}}
 function showErr(m){$("err").textContent=m;console.error(m);}
 function setStatus(m,kind){const s=$("status");s.textContent=m;s.className=kind||"";}
 window.addEventListener("error",e=>showErr("שגיאה: "+(e.message||e)));
@@ -57,9 +57,9 @@ window.addEventListener("unhandledrejection",e=>showErr("שגיאה: "+(e.reason
 function renderNotes(){
  const on=[];
  if(voices)for(const k of ["R","L"])voices[k].forEach((vc,j)=>{if(vc.on)on.push(HAND[k]+" · "+(vc.label||N[k][j][0]));});
- if(remoteMode==="band"&&typeof HM!=="undefined")for(const k of ["R","L"])for(let j=0;j<5;j++)if(bandOn[k][j])on.push(HAND[k]+" · "+HM.BAND[k][j]);
+ if((remoteMode==="band"||remoteMode==="orch")&&typeof HM!=="undefined")for(const k of ["R","L"])for(let j=0;j<5;j++)if(bandOn[k][j])on.push(HAND[k]+" · "+(remoteMode==="orch"?HM.ORCH:HM.BAND)[k][j]);
  for(const name of recent)on.push(name);
- $("notes").textContent=on.length?on.join("  ·  "):(remoteMode==="band"?"תזמורת ממתינה לאצבעות":remoteMode==="drums"?"מצב תופים":"אין תווים כרגע");
+ $("notes").textContent=on.length?on.join("  ·  "):(remoteMode==="orch"?"פילהרמונית ממתינה לאצבעות":remoteMode==="band"?"תזמורת ממתינה לאצבעות":remoteMode==="drums"?"מצב תופים":"אין תווים כרגע");
 }
 function showHit(name){recent.push(name);renderNotes();setTimeout(()=>{recent.shift();renderNotes();},480);}
 function applyMaster(pct){const n=Math.max(0,Math.min(100,Math.round(Number(pct))));if(!Number.isFinite(n))return;masterPct=n;
@@ -100,15 +100,16 @@ function applyMsg(d){
  if(d.t==="pause"){remotePaused=true;holdPos=groovePos();stopAll();return;}
  if(d.t==="resume"){remotePaused=false;const t=ac.currentTime;
   for(const k of ["R","L"]){hg[k].gain.cancelScheduledValues(t);hg[k].gain.setTargetAtTime(volStore[k],t,.05);if(engine)engine.setHand(k,volStore[k]);}
-  if(remoteMode==="band"&&engine)engine.setEnabled(true);return;}
+  if((remoteMode==="band"||remoteMode==="orch")&&engine)engine.setEnabled(true);return;}
  if(d.t==="stopAll"){stopAll();return;}
  if(d.t==="master"){if(!Number.isFinite(Number(d.v)))throw new Error("עוצמה לא תקינה");applyMaster(d.v);return;}
  if(d.t==="sync"){takeClock(d,false);return;}
  if(d.t==="pong"){takeClock(d,Date.now()-d.t);return;}
- if(d.t==="mode"){if(d.mode!=="notes"&&d.mode!=="drums"&&d.mode!=="band")throw new Error("מצב לא מוכר");
+ if(d.t==="mode"){if(d.mode!=="notes"&&d.mode!=="drums"&&d.mode!=="band"&&d.mode!=="orch")throw new Error("מצב לא מוכר");
   remoteMode=d.mode;
-  if(remoteMode!=="band"){bandOn.R=[0,0,0,0,0];bandOn.L=[0,0,0,0,0];if(engine)engine.stopAll();}
-  else if(!remotePaused&&engine)engine.setEnabled(true);
+  const groove=remoteMode==="band"||remoteMode==="orch";
+  if(!groove){bandOn.R=[0,0,0,0,0];bandOn.L=[0,0,0,0,0];if(engine)engine.stopAll();}
+  else {if(engine&&engine.setArrangement)engine.setArrangement(remoteMode==="orch"?"orch":"band");if(!remotePaused&&engine)engine.setEnabled(true);}
   renderNotes();return;}
  if(d.t==="layer"){const k=d.hand,i=d.i|0;if((k!=="R"&&k!=="L")||i<0||i>4)throw new Error("שכבת כלים לא תקינה");
   const on=!!d.on&&!remotePaused;bandOn[k][i]=on?1:0;if(engine)engine.setLayer(k,i,on);renderNotes();return;}

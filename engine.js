@@ -4,7 +4,7 @@
   let bpm = 122;
   function clampBpm(next) {
     const n = Math.round(Number(next) || 122);
-    return Math.max(118, Math.min(124, n));
+    return Math.max(90, Math.min(124, n));
   }
   function stepDur() { return 60 / bpm / 4; }
   function loopDur() { return stepDur() * STEPS; }
@@ -29,6 +29,10 @@
   const BAND = {
     R: ["🥁 קצב", "🎸 בס", "🎹 פסנתר", "🎸 גיטרה", "🎻 מיתרים"],
     L: ["🎛️ ליד", "🎶 חליל", "🔔 מרימבה", "🎺 נשיפה", "🎤 מקהלה"]
+  };
+  const ORCH = {
+    R: ["🎻 כינורות I", "🎻 כינורות II", "🎻 ויולות", "🎻 צ'לי", "🎻 קונטרבס"],
+    L: ["🎶 חליל", "🎶 אבוב", "🎺 קרנות", "🎺 חצוצרות", "🔔 נבל"]
   };
   const KIND = {
     R: ["kick", "snare", "hat", "ohat", "clap"],
@@ -68,6 +72,77 @@
     [[0, 86, 3], [6, 83, 4], [12, 86, 3]]
   ];
   const BASS = [[0, 0, 2.1], [3, 12, 1.05], [6, 7, 1.8], [8, 0, 1.15], [10, 12, 1.7], [13, 3, 0.9], [14, 7, 1.15]];
+  /* Philharmonic: Dm Bb F C, twice. Separate from the band progression. */
+  const OCH = [
+    { r: 38, c: [50, 53, 57] },
+    { r: 34, c: [46, 50, 53] },
+    { r: 41, c: [53, 57, 60] },
+    { r: 36, c: [48, 52, 55] },
+    { r: 38, c: [50, 53, 57] },
+    { r: 34, c: [46, 50, 53] },
+    { r: 41, c: [53, 57, 60] },
+    { r: 36, c: [48, 52, 55] }
+  ];
+  const VLN1 = [
+    [[0, 74, 6], [6, 77, 4], [10, 81, 4], [14, 77, 2]],
+    [[0, 70, 4], [4, 74, 4], [8, 77, 6], [14, 74, 2]],
+    [[0, 69, 4], [4, 72, 4], [8, 77, 4], [12, 76, 4]],
+    [[0, 79, 6], [6, 76, 4], [10, 72, 4], [14, 74, 2]],
+    [[0, 81, 8], [8, 77, 4], [12, 74, 4]],
+    [[0, 70, 4], [4, 74, 6], [10, 77, 4], [14, 79, 2]],
+    [[0, 81, 4], [4, 77, 4], [8, 72, 4], [12, 69, 4]],
+    [[0, 76, 4], [4, 79, 6], [10, 77, 2], [12, 74, 4]]
+  ];
+  const VLN2 = [
+    [[0, 69, 6], [6, 72, 4], [10, 74, 4], [14, 72, 2]],
+    [[0, 65, 4], [4, 69, 4], [8, 72, 6], [14, 70, 2]],
+    [[0, 65, 4], [4, 69, 4], [8, 72, 4], [12, 71, 4]],
+    [[0, 74, 6], [6, 71, 4], [10, 67, 4], [14, 69, 2]],
+    [[0, 77, 8], [8, 74, 4], [12, 69, 4]],
+    [[0, 65, 4], [4, 69, 6], [10, 72, 4], [14, 74, 2]],
+    [[0, 77, 4], [4, 74, 4], [8, 69, 4], [12, 65, 4]],
+    [[0, 72, 4], [4, 76, 6], [10, 74, 2], [12, 69, 4]]
+  ];
+  const VLA = [
+    [[0, 57, 8], [8, 53, 8]],
+    [[0, 58, 8], [8, 53, 8]],
+    [[0, 57, 8], [8, 60, 8]],
+    [[0, 55, 8], [8, 52, 8]],
+    [[0, 57, 8], [8, 62, 8]],
+    [[0, 58, 16]],
+    [[0, 57, 8], [8, 53, 8]],
+    [[0, 55, 8], [8, 50, 8]]
+  ];
+  const CELLO = [
+    [[0, 50, 8], [8, 53, 6], [14, 52, 2]],
+    [[0, 46, 4], [4, 50, 4], [8, 53, 8]],
+    [[0, 53, 8], [8, 57, 4], [12, 55, 4]],
+    [[0, 48, 4], [4, 52, 4], [8, 55, 8]],
+    [[0, 50, 6], [6, 57, 4], [10, 53, 6]],
+    [[0, 46, 8], [8, 50, 8]],
+    [[0, 53, 4], [4, 57, 4], [8, 60, 4], [12, 57, 4]],
+    [[0, 55, 8], [8, 50, 8]]
+  ];
+  const OFL = [
+    [[2, 81, 6], [10, 86, 5]],
+    [[4, 82, 6], [12, 77, 4]],
+    [[0, 77, 8], [8, 84, 6]],
+    [[2, 86, 6], [10, 79, 5]],
+    [[0, 86, 8], [8, 81, 6]],
+    [[4, 82, 8], [12, 86, 4]],
+    [[0, 89, 6], [8, 84, 4], [12, 81, 4]],
+    [[0, 84, 4], [4, 88, 8], [12, 81, 4]]
+  ];
+  const OBOE = [
+    [[4, 70, 4], [8, 74, 6]],
+    [[0, 70, 4], [6, 65, 4], [12, 70, 4]],
+    [[2, 69, 6], [10, 72, 4]],
+    [[0, 71, 4], [6, 67, 4], [12, 64, 4]],
+    [[4, 74, 6], [12, 69, 4]],
+    [[0, 70, 8], [8, 74, 6]],
+    [[2, 72, 4], [8, 69, 6]],
+    [[0, 76, 4], [6, 72, 4], [12, 67, 4]]
+  ];
 
   function risingHits(prev, curr, last, now, ms) {
     const out = [];
@@ -111,6 +186,27 @@
     reverb.buffer = ir;
     bandComp.connect(bandDry); bandDry.connect(dest);
     bandComp.connect(reverb); reverb.connect(bandWet); bandWet.connect(dest);
+    const orchComp = ac.createDynamicsCompressor();
+    orchComp.threshold.value = -16;
+    orchComp.knee.value = 8;
+    orchComp.ratio.value = 2.4;
+    orchComp.attack.value = 0.01;
+    orchComp.release.value = 0.25;
+    const orchDry = ac.createGain();
+    orchDry.gain.value = 1.6;
+    const orchWet = ac.createGain();
+    orchWet.gain.value = 0.55;
+    const hallLen = Math.floor(rate * 2.8);
+    const hall = ac.createBuffer(2, hallLen, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = hall.getChannelData(ch);
+      for (let i = 0; i < hallLen; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / hallLen, 1.55);
+    }
+    const hallVerb = ac.createConvolver();
+    hallVerb.buffer = hall;
+    orchComp.connect(orchDry); orchDry.connect(dest);
+    orchComp.connect(hallVerb); hallVerb.connect(orchWet); orchWet.connect(dest);
+    let arrangement = "band";
     for (const k of ["R", "L"]) {
       hand[k] = ac.createGain();
       hand[k].gain.value = 0;
@@ -234,7 +330,7 @@
       const g = layers[k][i].gain;
       const t = ac.currentTime;
       g.cancelScheduledValues(t);
-      const slow = (k === "R" && i === 4) || (k === "L" && i === 4);
+      const slow = arrangement === "orch" ? (k === "R" && i < 4) || (k === "L" && i === 2) : (k === "R" && i === 4) || (k === "L" && i === 4);
       g.setTargetAtTime(on ? 1 : 0, t, on ? (slow ? 0.35 : 0.05) : (slow ? 0.4 : 0.12));
     }
     function flute(freq, time, dur) {
@@ -260,7 +356,88 @@
     function playAt(list, stepInBar, fn) {
       for (let i = 0; i < list.length; i++) if (list[i][0] === stepInBar) fn(list[i]);
     }
+    function strings(destNode, note, time, dur, peak, open) {
+      const f0 = midi(note);
+      [1, 1.007, 0.993].forEach((ratio, i) => {
+        const o = ac.createOscillator();
+        o.type = "sawtooth";
+        o.frequency.setValueAtTime(Math.max(1, f0 * ratio), time);
+        const lfo = ac.createOscillator();
+        lfo.frequency.setValueAtTime(4.4 + i * 0.35, time);
+        const lg = ac.createGain();
+        lg.gain.setValueAtTime(Math.max(1, f0 * 0.0045), time);
+        lfo.connect(lg); lg.connect(o.frequency);
+        const f = ac.createBiquadFilter();
+        f.type = "lowpass";
+        f.frequency.setValueAtTime(open || 1400, time);
+        const g = ac.createGain();
+        const pk = Math.max(0.0001, peak);
+        const att = Math.min(0.32, Math.max(0.08, dur * 0.28));
+        g.gain.setValueAtTime(0.0001, time);
+        g.gain.exponentialRampToValueAtTime(pk, time + att);
+        g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+        o.connect(f); f.connect(g); g.connect(destNode);
+        o.start(time); lfo.start(time);
+        o.stop(time + dur + 0.05); lfo.stop(time + dur + 0.05);
+        remember(o, g, time + dur);
+        remember(lfo, lg, time + dur);
+      });
+    }
+    function pizz(destNode, note, time, peak) {
+      const f0 = midi(note);
+      tone(destNode, "triangle", f0, time, 0.24, peak, f0 * 0.72, 0.004);
+      burst(destNode, time, 0.025, peak * 0.28, "highpass", 1600);
+    }
+    function timp(destNode, note, time, peak) {
+      const f0 = Math.max(48, midi(note));
+      const o = ac.createOscillator();
+      o.type = "sine";
+      o.frequency.setValueAtTime(f0 * 1.35, time);
+      o.frequency.exponentialRampToValueAtTime(f0, time + 0.2);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(Math.max(0.0001, peak), time);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + 0.6);
+      o.connect(g); g.connect(destNode);
+      o.start(time); o.stop(time + 0.65);
+      remember(o, g, time + 0.65);
+      burst(destNode, time, 0.04, peak * 0.28, "lowpass", 420);
+    }
+    function reed(destNode, note, time, dur, peak) {
+      shaped(destNode, "sawtooth", midi(note), time, dur, peak * 0.65, "bandpass", 1350);
+      tone(destNode, "triangle", midi(note), time, dur, peak * 0.4, 0, 0.05);
+    }
+    function horn(destNode, note, time, dur, peak, bright) {
+      shaped(destNode, "sawtooth", midi(note), time, dur, peak, "lowpass", bright ? 2100 : 820);
+      tone(destNode, "triangle", midi(note), time, dur, peak * 0.45, 0, bright ? 0.04 : 0.14);
+    }
+    function lineAt(list, stepInBar, fn) {
+      for (let i = 0; i < list.length; i++) if (list[i][0] === stepInBar) fn(list[i]);
+    }
+    function fireOrch(step, time) {
+      const sd = stepDur();
+      const bar = Math.floor(step / 16) % 8;
+      const s = step % 16;
+      const chord = OCH[bar];
+      if (layerOn.R[0]) lineAt(VLN1[bar], s, n => strings(layers.R[0], n[1], time, sd * n[2] * 0.98, 0.18, 1900));
+      if (layerOn.R[1]) lineAt(VLN2[bar], s, n => strings(layers.R[1], n[1], time, sd * n[2] * 0.98, 0.14, 1500));
+      if (layerOn.R[2]) lineAt(VLA[bar], s, n => strings(layers.R[2], n[1], time, sd * n[2] * 0.98, 0.13, 1000));
+      if (layerOn.R[3]) lineAt(CELLO[bar], s, n => strings(layers.R[3], n[1], time, sd * n[2] * 0.98, 0.17, 780));
+      if (layerOn.R[4]) {
+        if (s % 4 === 0) pizz(layers.R[4], chord.r + (s === 12 ? 12 : s === 4 ? 7 : 0), time, 0.62);
+        if (s === 0) strings(layers.R[4], chord.r, time, sd * 14.5, 0.07, 420);
+      }
+      if (layerOn.L[0]) lineAt(OFL[bar], s, n => flute(midi(n[1]), time, sd * n[2] * 0.96));
+      if (layerOn.L[1]) lineAt(OBOE[bar], s, n => reed(layers.L[1], n[1], time, sd * n[2] * 0.95, 0.22));
+      if (layerOn.L[2] && s === 0) chord.c.forEach(m => horn(layers.L[2], m, time, sd * 15.2, 0.12, false));
+      if (layerOn.L[3] && (s === 0 || s === 8 || (s === 4 && bar % 2 === 0))) horn(layers.L[3], chord.c[s === 0 ? 2 : 1] + 12, time, sd * (s === 0 ? 6 : 2.5), 0.2, true);
+      if (layerOn.L[4]) {
+        if (s === 0 || s === 8) timp(layers.L[4], chord.r, time, s === 0 ? 0.75 : 0.48);
+        if ((bar === 3 || bar === 7) && s >= 12) timp(layers.L[4], chord.r, time, 0.36);
+        if (s % 2 === 0) tone(layers.L[4], "sine", midi(chord.c[(s / 2) % 3] + 24), time, sd * 1.15, 0.18, midi(chord.c[0] + 12), 0.004);
+      }
+    }
     function fire(step, time) {
+      if (arrangement === "orch") { fireOrch(step, time); return; }
       const sd = stepDur();
       const bar = Math.floor(step / 16) % 8;
       const s = step % 16;
@@ -372,6 +549,13 @@
         }
       }
     }
+    function setArrangement(kind) {
+      arrangement = kind === "orch" ? "orch" : "band";
+      for (const k of ["R", "L"]) {
+        try { hand[k].disconnect(); } catch (e) {}
+        hand[k].connect(arrangement === "orch" ? orchComp : bandComp);
+      }
+    }
     function realign() { aligned = false; align(getPos ? getPos() : 0); }
     function setLocal(on) {
       on = !!on;
@@ -382,11 +566,11 @@
     }
     return {
       layerOn: layerOn, triggerDrum: triggerDrum, setHand: setHand, setLayer: setLayer,
-      setEnabled: setEnabled, setLocal: setLocal, align: align, realign: realign, pump: pump, stopAll: stopAll, hit: hit
+      setEnabled: setEnabled, setLocal: setLocal, setArrangement: setArrangement, align: align, realign: realign, pump: pump, stopAll: stopAll, hit: hit
     };
   }
 
-  const api = { BPM: bpm, STEP: stepDur(), STEPS: STEPS, LOOP: loopDur(), DRUMS: DRUMS, BAND: BAND, risingHits: risingHits, createEngine: createEngine, setBpm: setBpm, masterFromPercent: masterFromPercent, makeLimiter: makeLimiter };
+  const api = { BPM: bpm, STEP: stepDur(), STEPS: STEPS, LOOP: loopDur(), DRUMS: DRUMS, BAND: BAND, ORCH: ORCH, risingHits: risingHits, createEngine: createEngine, setBpm: setBpm, masterFromPercent: masterFromPercent, makeLimiter: makeLimiter };
   function syncApi() { api.BPM = bpm; api.STEP = stepDur(); api.LOOP = loopDur(); api.STEPS = STEPS; }
   syncApi();
   root.HM = api;
