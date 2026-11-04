@@ -20,7 +20,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <h1>🔊 רמקול</h1>
-<p class="sub">השמעה מהנגן שעל המחשב</p>
+<p class="sub" id="sub">השמעה מהנגן שעל המחשב · 122 BPM · 8 תיבות</p>
 <div id="status">ממתינים להפעלת צליל</div>
 <button id="go">הפעל צליל</button>
 <div class="card"><div id="room"></div><div id="notes">אין תווים כרגע</div></div>
@@ -40,6 +40,8 @@ function hostNow(){return Date.now()+offset;}
 function groovePos(){if(remotePaused)return holdPos;if(!origin||typeof HM==="undefined")return 0;
  let s=((hostNow()-origin)/1000)%HM.LOOP;if(s<0)s+=HM.LOOP;return s;}
 function takeClock(d,rtt){if(!d||typeof HM==="undefined")return;
+ if(d.bpm&&HM.setBpm)HM.setBpm(d.bpm);
+ if(d.bpm&&$("sub"))$("sub").textContent="השמעה מהנגן · "+HM.BPM+" BPM · 8 תיבות";
  if(typeof rtt==="number")offset=d.hostNow-(d.t+rtt/2);else if(!offset)offset=d.hostNow-Date.now();
  if(d.origin)origin=d.origin;
  if(d.paused){remotePaused=true;holdPos=d.pos||0;if(engine)engine.stopAll();return;}

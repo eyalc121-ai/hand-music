@@ -22,7 +22,9 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
 .help{max-width:800px;color:#9ca3af;line-height:1.7;font-size:14px}
 #mode{margin:0 0 12px;padding:8px 18px;border-radius:999px;background:#14532d;color:#86efac;font-weight:700;font-size:18px}
 #mode.paused{background:#7f1d1d;color:#fecaca}
-#inst{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap;justify-content:center}
+#inst{display:flex;gap:8px;margin:0 0 8px;flex-wrap:wrap;justify-content:center}
+#tempoBox{display:flex;align-items:center;gap:8px;margin:0 0 14px;color:#9ca3af;font-size:14px}
+#tempo{width:148px;accent-color:#a855f7}
 #inst button{font-size:16px;padding:8px 16px;margin:0;background:#1f2937;color:#cbd5e1}
 #inst button.on{background:linear-gradient(90deg,#6366f1,#a855f7);color:#fff}
 #cast{display:flex;flex-direction:column;align-items:center;gap:8px;margin:4px 16px 12px;padding:14px 18px;background:#111827;border-radius:16px;max-width:min(520px,92vw);text-align:center}
@@ -43,6 +45,9 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
   <button type="button" id="bd">🥁 תופים</button>
   <button type="button" id="bb">🎼 תזמורת</button>
 </div>
+<label id="tempoBox">קצב <b id="tempoVal">122</b>
+  <input id="tempo" type="range" min="118" max="124" step="1" value="122" aria-label="קצב התזמורת">
+</label>
 <div id="wrap">
   <div id="stage">
     <video id="v" playsinline muted></video><canvas id="c"></canvas>
@@ -66,7 +71,7 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
 <b>יד ימין</b> (אגודל→זרת): דו רה מי פה סול · <b>יד שמאל</b>: סול לה סי דו רה (אוקטבה גבוהה).<br>
 פתיחת כף היד הכוללת קובעת את העוצמה של אותה יד.<br>
 במצב «🥁 תופים» פתיחת אצבע מקישה פעם אחת. ימין: קיק, סנייר, האט סגור, האט פתוח, קלאפ. שמאל: טום נמוך, טום אמצע, טום גבוה, קראש, קאובל.<br>
-במצב «🎼 תזמורת» כל אצבע מוסיפה כלי ללופ משותף (100 BPM, ארבעה תיבות בדו מז'ור). ימין: קצב, בס, פסנתר, גיטרה, מיתרים. שמאל: ליד, חליל, מרימבה, נשיפה, מקהלה. סגירה מורידה את הכלי, ופתיחת כף היד קובעת את עוצמת היד. הבחירה נשמרת בדפדפן.<br>
+במצב «🎼 תזמורת» כל אצבע מוסיפה כלי לגרוב של 122 BPM (אפשר 118–124 במחוון), שמונה תיבות Am–F–C–G: קיק על כל רבע, היי-האט על כל שישה-עשר, סנייר על 2 ו-4, ומילוי כל ארבעה תיבות. ימין: קצב, בס, פסנתר, גיטרה, מיתרים. שמאל: ליד, חליל, מרימבה, נשיפה, מקהלה. סגירה מורידה את הכלי, ופתיחת כף היד קובעת את עוצמת היד. הבחירה נשמרת בדפדפן.<br>
 מחאו כפיים — קרבו את מרכזי שתי כפות הידיים — כדי להשהות את הנגינה, ומחאו שוב כדי להמשיך.<br>
 אחרי «התחל» מופיע קוד QR לכתובת הרמקול בטלפון. «השמע גם במחשב» (פעיל כברירת מחדל) קובע אם התווים נשמעים גם כאן.</div>
 <style>.keys{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap;justify-content:center}.keys div{width:76px;padding:10px 0;border-radius:10px;background:#1f2937;font-size:12px;line-height:1.25;transition:.1s}.keys div.on{background:#22c55e;color:#06210f;font-weight:bold;box-shadow:0 0 16px #22c55e}.keys div.hit{background:#f59e0b;color:#1c1003;font-weight:bold;box-shadow:0 0 16px #f59e0b}</style>
@@ -246,6 +251,17 @@ function setPlayMode(m){if(!MODES.includes(m)||m===playMode)return;playMode=m;
  if(ac){silence();broadcast({t:"stopAll"});broadcast({t:"mode",mode:m});if(m==="band"&&engine&&!paused){engine.setEnabled(true);broadcastSync();}}
  else if(typeof HM==="undefined"&&m!=="notes")castErr("מנוע הצליל לא נטען. רעננו את הדף.");
  applyLabels();}
+function setTempo(raw){if(typeof HM==="undefined"||!HM.setBpm)return;
+ const next=Math.max(118,Math.min(124,Math.round(Number(raw)||122)));
+ const had=clockOrigin||clockHold;let idx=0;
+ if(had)idx=loopPos()/HM.STEP;
+ HM.setBpm(next);
+ if(had){const pos=(idx%HM.STEPS)*HM.STEP;if(clockHold)clockPausedAt=pos;else clockOrigin=Date.now()-pos*1000;if(engine&&engine.realign)engine.realign();}
+ $("tempo").value=String(HM.BPM);$("tempoVal").textContent=String(HM.BPM);
+ try{localStorage.setItem("handmusic-bpm",String(HM.BPM));}catch(e){}
+ if(ac)broadcastSync();}
+try{const savedBpm=parseInt(localStorage.getItem("handmusic-bpm"),10);if(savedBpm>=118&&savedBpm<=124&&typeof HM!=="undefined")HM.setBpm(savedBpm);}catch(e){}
+if($("tempo")&&typeof HM!=="undefined"){$("tempo").value=String(HM.BPM);$("tempoVal").textContent=String(HM.BPM);$("tempo").oninput=()=>setTempo($("tempo").value);}
 applyLabels();
 $("bn").onclick=()=>setPlayMode("notes");
 $("bd").onclick=()=>setPlayMode("drums");

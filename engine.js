@@ -1,9 +1,14 @@
-/* Shared drum hits and the 100 BPM band loop. Host and speaker both load this file. */
+/* Shared drum hits and the band loop: 122 BPM, 8 bars, Am–F–C–G. */
 (function (root) {
-  const BPM = 100;
-  const STEP = 60 / BPM / 4;
-  const STEPS = 64;
-  const LOOP = STEP * STEPS;
+  const STEPS = 128;
+  let bpm = 122;
+  function clampBpm(next) {
+    const n = Math.round(Number(next) || 122);
+    return Math.max(118, Math.min(124, n));
+  }
+  function stepDur() { return 60 / bpm / 4; }
+  function loopDur() { return stepDur() * STEPS; }
+  function setBpm(next) { bpm = clampBpm(next); syncApi(); }
   const DRUMS = {
     R: ["🥁 קיק", "🥁 סנייר", "🥁 האט סגור", "🥁 האט פתוח", "👏 קלאפ"],
     L: ["🥁 טום נמוך", "🥁 טום אמצע", "🥁 טום גבוה", "🥁 קראש", "🥁 קאובל"]
@@ -16,12 +21,40 @@
     R: ["kick", "snare", "hat", "ohat", "clap"],
     L: ["tomL", "tomM", "tomH", "crash", "rim"]
   };
-  const PROG = [
-    { bass: [65.41, 65.41, 98, 82.41], chord: [261.63, 329.63, 392], lead: [329.63, 392, 523.25, 392] },
-    { bass: [55, 55, 82.41, 65.41], chord: [220, 261.63, 329.63], lead: [329.63, 523.25, 440, 329.63] },
-    { bass: [43.65, 43.65, 65.41, 55], chord: [174.61, 220, 261.63], lead: [349.23, 440, 523.25, 440] },
-    { bass: [49, 49, 73.42, 61.74], chord: [196, 246.94, 293.66], lead: [392, 493.88, 587.33, 493.88] }
+  function midi(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+  /* 8 bars: Am F C G Am F C G. r = bass root, p = piano voicing, g = guitar/high. */
+  const CH = [
+    { r: 33, p: [57, 60, 64], g: [69, 72, 76] },
+    { r: 29, p: [53, 57, 60], g: [65, 69, 72] },
+    { r: 36, p: [60, 64, 67], g: [72, 76, 79] },
+    { r: 31, p: [55, 59, 62], g: [67, 71, 74] },
+    { r: 33, p: [57, 60, 64], g: [69, 72, 76] },
+    { r: 29, p: [53, 57, 60], g: [65, 69, 72] },
+    { r: 36, p: [60, 64, 67], g: [72, 76, 79] },
+    { r: 31, p: [55, 59, 62], g: [67, 71, 74] }
   ];
+  /* [step in bar, midi, length in sixteenths] */
+  const LEAD = [
+    [[0, 64, 2], [3, 67, 1], [6, 69, 2], [10, 72, 2], [14, 67, 2]],
+    [[0, 65, 2], [2, 69, 1], [4, 72, 3], [8, 69, 2], [12, 67, 2], [15, 64, 1]],
+    [[0, 67, 2], [3, 64, 2], [6, 67, 2], [8, 72, 2], [11, 74, 2], [14, 72, 2]],
+    [[0, 71, 2], [3, 74, 2], [6, 71, 2], [8, 67, 2], [11, 69, 2], [14, 65, 2]],
+    [[0, 69, 2], [2, 72, 2], [4, 76, 3], [8, 74, 2], [10, 72, 2], [12, 69, 2], [15, 67, 1]],
+    [[0, 72, 2], [4, 69, 2], [6, 65, 2], [8, 69, 2], [12, 72, 2], [14, 69, 2]],
+    [[0, 76, 2], [3, 74, 2], [6, 72, 2], [8, 67, 3], [12, 64, 2], [14, 67, 2]],
+    [[0, 74, 2], [4, 71, 2], [8, 67, 2], [10, 69, 2], [12, 71, 2], [14, 74, 2]]
+  ];
+  const FLUTE = [
+    [[4, 81, 4], [10, 76, 4]],
+    [[2, 84, 4], [8, 81, 4], [14, 77, 2]],
+    [[0, 79, 3], [6, 76, 4], [12, 84, 3]],
+    [[3, 83, 4], [8, 79, 4], [14, 74, 2]],
+    [[2, 81, 3], [6, 88, 4], [12, 84, 3]],
+    [[0, 84, 4], [8, 81, 4], [14, 77, 2]],
+    [[4, 88, 4], [10, 84, 4]],
+    [[0, 86, 3], [6, 83, 4], [12, 86, 3]]
+  ];
+  const BASS = [[0, 0, 2.1], [3, 12, 1.05], [6, 7, 1.8], [8, 0, 1.15], [10, 12, 1.7], [13, 3, 0.9], [14, 7, 1.15]];
 
   function risingHits(prev, curr, last, now, ms) {
     const out = [];
@@ -36,17 +69,38 @@
     let noiseBuf = null, timer = null, enabled = false, local = true, aligned = false;
     let nextStep = 0, nextStepAc = 0;
 
-    function bus() {
+    function bus(target) {
       const g = ac.createGain();
       g.gain.value = 1;
-      g.connect(dest);
+      g.connect(target || dest);
       return g;
     }
-    const drumBus = bus();
+    const drumBus = bus(dest);
+    const bandComp = ac.createDynamicsCompressor();
+    bandComp.threshold.value = -18;
+    bandComp.knee.value = 10;
+    bandComp.ratio.value = 2.6;
+    bandComp.attack.value = 0.006;
+    bandComp.release.value = 0.16;
+    const bandDry = ac.createGain();
+    bandDry.gain.value = 0.92;
+    const bandWet = ac.createGain();
+    bandWet.gain.value = 0.2;
+    const rate = ac.sampleRate || 44100;
+    const irLen = Math.floor(rate * 0.9);
+    const ir = ac.createBuffer(2, irLen, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = ir.getChannelData(ch);
+      for (let i = 0; i < irLen; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irLen, 2.6);
+    }
+    const reverb = ac.createConvolver();
+    reverb.buffer = ir;
+    bandComp.connect(bandDry); bandDry.connect(dest);
+    bandComp.connect(reverb); reverb.connect(bandWet); bandWet.connect(dest);
     for (const k of ["R", "L"]) {
       hand[k] = ac.createGain();
       hand[k].gain.value = 0;
-      hand[k].connect(dest);
+      hand[k].connect(bandComp);
       for (let i = 0; i < 5; i++) {
         const g = ac.createGain();
         g.gain.value = 0;
@@ -69,14 +123,16 @@
       const ms = Math.max(40, (endTime - ac.currentTime) * 1000 + 80);
       setTimeout(() => { const i = live.indexOf(node); if (i >= 0) live.splice(i, 1); }, ms);
     }
-    function tone(destNode, type, freq, t, dur, peak, glide) {
+    function tone(destNode, type, freq, t, dur, peak, glide, attack) {
       const o = ac.createOscillator();
       o.type = type;
       o.frequency.setValueAtTime(Math.max(1, freq), t);
-      if (glide) o.frequency.exponentialRampToValueAtTime(Math.max(1, glide), t + Math.min(0.12, dur));
+      if (glide) o.frequency.exponentialRampToValueAtTime(Math.max(1, glide), t + Math.min(0.1, dur * 0.45));
       const g = ac.createGain();
       const pk = Math.max(0.0001, peak);
-      g.gain.setValueAtTime(pk, t);
+      const a = Math.max(0.004, Math.min(attack || 0.006, dur * 0.45));
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(pk, t + a);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       o.connect(g); g.connect(destNode);
       o.start(t); o.stop(t + dur + 0.03);
@@ -167,62 +223,89 @@
       const slow = (k === "R" && i === 4) || (k === "L" && i === 4);
       g.setTargetAtTime(on ? 1 : 0, t, on ? (slow ? 0.35 : 0.05) : (slow ? 0.4 : 0.12));
     }
-    function flute(freq, time) {
+    function flute(freq, time, dur) {
+      const d = Math.max(0.08, dur || 0.4);
       const o = ac.createOscillator();
       o.type = "sine";
       o.frequency.setValueAtTime(freq, time);
       const lfo = ac.createOscillator();
-      lfo.frequency.setValueAtTime(5, time);
+      lfo.frequency.setValueAtTime(5.2, time);
       const lg = ac.createGain();
-      lg.gain.setValueAtTime(5, time);
+      lg.gain.setValueAtTime(6, time);
       lfo.connect(lg); lg.connect(o.frequency);
       const g = ac.createGain();
       g.gain.setValueAtTime(0.0001, time);
-      g.gain.exponentialRampToValueAtTime(0.12, time + 0.07);
-      g.gain.exponentialRampToValueAtTime(0.0001, time + 0.55);
+      g.gain.exponentialRampToValueAtTime(0.11, time + Math.min(0.05, d * 0.25));
+      g.gain.exponentialRampToValueAtTime(0.0001, time + d);
       o.connect(g); g.connect(layers.L[1]);
       o.start(time); lfo.start(time);
-      o.stop(time + 0.6); lfo.stop(time + 0.6);
-      remember(o, g, time + 0.6);
-      remember(lfo, lg, time + 0.6);
+      o.stop(time + d + 0.05); lfo.stop(time + d + 0.05);
+      remember(o, g, time + d);
+      remember(lfo, lg, time + d);
+    }
+    function playAt(list, stepInBar, fn) {
+      for (let i = 0; i < list.length; i++) if (list[i][0] === stepInBar) fn(list[i]);
     }
     function fire(step, time) {
-      const bar = Math.floor(step / 16) % 4;
+      const sd = stepDur();
+      const bar = Math.floor(step / 16) % 8;
       const s = step % 16;
-      const q = Math.floor(s / 4);
-      const P = PROG[bar];
+      const chord = CH[bar];
+      const fill = (bar === 3 || bar === 7) && s >= 12;
       if (layerOn.R[0]) {
-        if (s === 0 || s === 8) hit("kick", 0.9, time, layers.R[0]);
-        if (s === 4 || s === 12) hit("snare", 0.75, time, layers.R[0]);
-        if (s % 2 === 0 && s !== 14) hit("hat", 0.4, time, layers.R[0]);
-        if (s === 14) hit("ohat", 0.5, time, layers.R[0]);
+        if (fill) {
+          if (s === 12) { hit("snare", 0.78, time, layers.R[0]); hit("clap", 0.42, time, layers.R[0]); }
+          if (s === 13) hit("tomH", 0.72, time, layers.R[0]);
+          if (s === 14) hit("tomM", 0.74, time, layers.R[0]);
+          if (s === 15) { hit("tomL", 0.8, time, layers.R[0]); hit("snare", 0.36, time, layers.R[0]); }
+        } else {
+          if (s % 4 === 0) hit("kick", 0.95, time, layers.R[0]);
+          if (s === 4 || s === 12) { hit("snare", 0.7, time, layers.R[0]); hit("clap", 0.38, time, layers.R[0]); }
+          if (s % 4 === 2) hit("ohat", 0.48, time, layers.R[0]);
+          else hit("hat", s % 4 === 0 ? 0.34 : 0.2, time, layers.R[0]);
+        }
+        if ((bar === 0 || bar === 4) && s === 0) hit("crash", 0.42, time, layers.R[0]);
       }
-      if (layerOn.R[1] && s % 4 === 0) tone(layers.R[1], "sine", P.bass[q], time, 0.32, 0.55);
-      if (layerOn.R[2] && (s === 0 || s === 8)) P.chord.forEach(f => tone(layers.R[2], "triangle", s === 8 ? f * 2 : f, time, 0.75, 0.15));
-      if (layerOn.R[3] && s % 4 === 0) P.chord.forEach((f, n) => tone(layers.R[3], "triangle", f, time + n * 0.018, 0.16, 0.16));
-      if (layerOn.R[4] && s === 0) P.chord.forEach(f => shaped(layers.R[4], "sawtooth", f, time, 2.25, 0.07, "lowpass", 1200));
-      if (layerOn.L[0] && s % 4 === 0) shaped(layers.L[0], "square", P.lead[q], time, 0.34, 0.1, "lowpass", 1800);
-      if (layerOn.L[1] && (s === 0 || s === 8)) flute(P.lead[q], time);
-      if (layerOn.L[2] && s % 2 === 0) tone(layers.L[2], "sine", P.chord[s % 3] * 2, time, 0.14, 0.22, P.chord[s % 3] * 1.4);
-      if (layerOn.L[3] && s === 6) P.chord.forEach(f => shaped(layers.L[3], "sawtooth", f, time, 0.16, 0.12, "bandpass", 900));
-      if (layerOn.L[4] && s === 0) P.chord.forEach(f => {
-        tone(layers.L[4], "sine", f, time, 2.4, 0.05);
-        tone(layers.L[4], "sine", f * 1.004, time, 2.4, 0.04);
+      if (layerOn.R[1]) playAt(BASS, s, n => tone(layers.R[1], "sine", midi(chord.r + n[1]), time, sd * n[2], 0.5, 0, 0.004));
+      if (layerOn.R[1] && s === 15 && (bar === 3 || bar === 7)) tone(layers.R[1], "sine", midi(33), time, sd * 0.9, 0.42, 0, 0.004);
+      if (layerOn.R[2]) {
+        if (s === 0) chord.p.forEach(m => tone(layers.R[2], "triangle", midi(m), time, sd * 1.7, 0.11, 0, 0.008));
+        if (s % 4 === 2) chord.p.forEach(m => tone(layers.R[2], "triangle", midi(m + 12), time, sd * 0.85, 0.08, 0, 0.005));
+        if (s === 11 && bar % 2 === 1) chord.g.forEach(m => tone(layers.R[2], "triangle", midi(m), time, sd * 0.7, 0.07, 0, 0.005));
+      }
+      if (layerOn.R[3]) {
+        if (s % 4 === 0) chord.g.forEach((m, n) => tone(layers.R[3], "triangle", midi(m), time + n * 0.012, sd * 1.25, s === 0 ? 0.1 : 0.07, 0, 0.004));
+        if (s === 3 || s === 7 || s === 11 || s === 15) tone(layers.R[3], "triangle", midi(chord.g[(s / 4) | 0] || chord.g[0]), time, sd * 0.7, 0.08, midi(chord.g[0]), 0.004);
+      }
+      if (layerOn.R[4] && s === 0) chord.p.forEach(m => shaped(layers.R[4], "sawtooth", midi(m), time, sd * 15.2, 0.055, "lowpass", bar >= 4 ? 1600 : 1100));
+      if (layerOn.L[0]) playAt(LEAD[bar], s, n => shaped(layers.L[0], "square", midi(n[1]), time, sd * n[2] * 0.92, 0.1, "lowpass", 2100));
+      if (layerOn.L[1]) playAt(FLUTE[bar], s, n => flute(midi(n[1]), time, sd * n[2] * 0.95));
+      if (layerOn.L[2] && (s % 2 === 0 || s === 3 || s === 11)) {
+        const toneIdx = (s + bar) % 3;
+        const hi = chord.g[toneIdx] + (s >= 8 ? 12 : 0);
+        tone(layers.L[2], "sine", midi(hi), time, sd * 0.95, s % 4 === 0 ? 0.2 : 0.13, midi(hi - 12), 0.004);
+      }
+      if (layerOn.L[3] && (s === 4 || s === 12 || (s === 14 && bar % 2 === 1))) chord.p.forEach(m => shaped(layers.L[3], "sawtooth", midi(m + 12), time, sd * 1.05, 0.1, "bandpass", 980));
+      if (layerOn.L[4] && s === 0) chord.g.forEach(m => {
+        tone(layers.L[4], "sine", midi(m), time, sd * 15.4, 0.045, 0, 0.28);
+        tone(layers.L[4], "sine", midi(m) * 1.004, time, sd * 15.4, 0.035, 0, 0.32);
       });
     }
     function align(pos) {
-      pos = ((Number(pos) || 0) % LOOP + LOOP) % LOOP;
-      const step = Math.floor(pos / STEP) % STEPS;
-      const into = pos - Math.floor(pos / STEP) * STEP;
-      const wantAc = ac.currentTime + (STEP - into);
-      const wantStep = (step + 1) % STEPS;
+      const loop = loopDur();
+      const step = stepDur();
+      pos = ((Number(pos) || 0) % loop + loop) % loop;
+      const idx = Math.floor(pos / step) % STEPS;
+      const into = pos - Math.floor(pos / step) * step;
+      const wantAc = ac.currentTime + (step - into);
+      const wantStep = (idx + 1) % STEPS;
       if (!aligned) {
         nextStep = wantStep;
         nextStepAc = wantAc;
         aligned = true;
         return;
       }
-      if (Math.abs(nextStepAc - wantAc) > 0.04) {
+      if (Math.abs(nextStepAc - wantAc) > 0.035) {
         nextStep = wantStep;
         nextStepAc = wantAc;
       }
@@ -234,7 +317,7 @@
       while (nextStepAc < horizon && n++ < 8) {
         fire(nextStep, Math.max(nextStepAc, ac.currentTime));
         nextStep = (nextStep + 1) % STEPS;
-        nextStepAc += STEP;
+        nextStepAc += stepDur();
       }
     }
     function tick() {
@@ -275,6 +358,7 @@
         }
       }
     }
+    function realign() { aligned = false; align(getPos ? getPos() : 0); }
     function setLocal(on) {
       on = !!on;
       if (local === on) return;
@@ -284,11 +368,13 @@
     }
     return {
       layerOn: layerOn, triggerDrum: triggerDrum, setHand: setHand, setLayer: setLayer,
-      setEnabled: setEnabled, setLocal: setLocal, align: align, pump: pump, stopAll: stopAll, hit: hit
+      setEnabled: setEnabled, setLocal: setLocal, align: align, realign: realign, pump: pump, stopAll: stopAll, hit: hit
     };
   }
 
-  const api = { BPM: BPM, STEP: STEP, STEPS: STEPS, LOOP: LOOP, DRUMS: DRUMS, BAND: BAND, risingHits: risingHits, createEngine: createEngine };
+  const api = { BPM: bpm, STEP: stepDur(), STEPS: STEPS, LOOP: loopDur(), DRUMS: DRUMS, BAND: BAND, risingHits: risingHits, createEngine: createEngine, setBpm: setBpm };
+  function syncApi() { api.BPM = bpm; api.STEP = stepDur(); api.LOOP = loopDur(); api.STEPS = STEPS; }
+  syncApi();
   root.HM = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
