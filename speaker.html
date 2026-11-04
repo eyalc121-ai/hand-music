@@ -16,11 +16,13 @@ button:disabled{opacity:.55;cursor:default}
 #notes{font-size:20px;line-height:1.6;min-height:1.6em}
 #err{color:#f87171;min-height:1.4em;margin-top:12px;text-align:center;max-width:520px}
 #room{color:#7dd3fc;word-break:break-all;font-size:14px}
+#masterRead{margin-top:8px;font-size:22px;font-weight:700;color:#86efac}
 </style>
 </head>
 <body>
 <h1>🔊 רמקול</h1>
 <p class="sub" id="sub">השמעה מהנגן שעל המחשב · 122 BPM · 8 תיבות</p>
+<div id="masterRead">עוצמה 100%</div>
 <div id="status">ממתינים להפעלת צליל</div>
 <button id="go">הפעל צליל</button>
 <div class="card"><div id="room"></div><div id="notes">אין תווים כרגע</div></div>
@@ -33,7 +35,7 @@ const HAND={R:"ימין",L:"שמאל"};
 const $=id=>document.getElementById(id);
 const params=new URLSearchParams(location.search);
 const room=(params.get("room")||"").trim();
-let ac,voices,hg,peer,conn,epoch=0,attempt=0,timer=null,remotePaused=false,engine,pingTimer=null;
+let ac,voices,hg,peer,conn,epoch=0,attempt=0,timer=null,remotePaused=false,engine,pingTimer=null,masterGain=null,masterPct=100;
 let origin=0,offset=0,holdPos=0,remoteMode="notes";
 const volStore={R:0,L:0},bandOn={R:[0,0,0,0,0],L:[0,0,0,0,0]},recent=[];
 function hostNow(){return Date.now()+offset;}
@@ -41,6 +43,7 @@ function groovePos(){if(remotePaused)return holdPos;if(!origin||typeof HM==="und
  let s=((hostNow()-origin)/1000)%HM.LOOP;if(s<0)s+=HM.LOOP;return s;}
 function takeClock(d,rtt){if(!d||typeof HM==="undefined")return;
  if(d.bpm&&HM.setBpm)HM.setBpm(d.bpm);
+ if(d.master!=null&&Number.isFinite(Number(d.master)))applyMaster(d.master);
  if(d.bpm&&$("sub"))$("sub").textContent="השמעה מהנגן · "+HM.BPM+" BPM · 8 תיבות";
  if(typeof rtt==="number")offset=d.hostNow-(d.t+rtt/2);else if(!offset)offset=d.hostNow-Date.now();
  if(d.origin)origin=d.origin;
@@ -59,17 +62,24 @@ function renderNotes(){
  $("notes").textContent=on.length?on.join("  ·  "):(remoteMode==="band"?"תזמורת ממתינה לאצבעות":remoteMode==="drums"?"מצב תופים":"אין תווים כרגע");
 }
 function showHit(name){recent.push(name);renderNotes();setTimeout(()=>{recent.shift();renderNotes();},480);}
+function applyMaster(pct){const n=Math.max(0,Math.min(100,Math.round(Number(pct))));if(!Number.isFinite(n))return;masterPct=n;
+ if($("masterRead"))$("masterRead").textContent="עוצמה "+n+"%";
+ if(masterGain&&ac){const g=typeof HM!=="undefined"&&HM.masterFromPercent?HM.masterFromPercent(n):(n/100)*1.85;
+  masterGain.gain.cancelScheduledValues(ac.currentTime);masterGain.gain.setTargetAtTime(g,ac.currentTime,0.03);}}
 function audio(){
  ac=new AudioContext();
- const comp=ac.createDynamicsCompressor();comp.connect(ac.destination);
+ masterGain=ac.createGain();
+ masterGain.gain.value=typeof HM!=="undefined"&&HM.masterFromPercent?HM.masterFromPercent(masterPct):(masterPct/100)*1.85;
+ const limiter=typeof HM!=="undefined"&&HM.makeLimiter?HM.makeLimiter(ac):ac.createDynamicsCompressor();
+ masterGain.connect(limiter);limiter.connect(ac.destination);
  voices={};hg={};
  for(const k of ["R","L"]){
-  hg[k]=ac.createGain();hg[k].gain.value=0;hg[k].connect(comp);
+  hg[k]=ac.createGain();hg[k].gain.value=0;hg[k].connect(masterGain);
   voices[k]=N[k].map(([name,f])=>{const o=ac.createOscillator();o.type="triangle";o.frequency.value=f;
    const g=ac.createGain();g.gain.value=0;o.connect(g).connect(hg[k]);o.start();return{g,on:false,label:name};});
  }
  if(typeof HM==="undefined")throw new Error("מנוע הצליל לא נטען");
- engine=HM.createEngine(ac,comp,groovePos);
+ engine=HM.createEngine(ac,masterGain,groovePos);
 }
 function stopAll(){
  if(!ac)return;
@@ -92,6 +102,7 @@ function applyMsg(d){
   for(const k of ["R","L"]){hg[k].gain.cancelScheduledValues(t);hg[k].gain.setTargetAtTime(volStore[k],t,.05);if(engine)engine.setHand(k,volStore[k]);}
   if(remoteMode==="band"&&engine)engine.setEnabled(true);return;}
  if(d.t==="stopAll"){stopAll();return;}
+ if(d.t==="master"){if(!Number.isFinite(Number(d.v)))throw new Error("עוצמה לא תקינה");applyMaster(d.v);return;}
  if(d.t==="sync"){takeClock(d,false);return;}
  if(d.t==="pong"){takeClock(d,Date.now()-d.t);return;}
  if(d.t==="mode"){if(d.mode!=="notes"&&d.mode!=="drums"&&d.mode!=="band")throw new Error("מצב לא מוכר");
@@ -116,7 +127,7 @@ function applyMsg(d){
   if((k!=="R"&&k!=="L")||!voices[k]||!voices[k][i])throw new Error("תו לא מוכר");
   const vc=voices[k][i],on=d.t==="noteOn"&&!remotePaused;
   vc.on=on;if(d.name)vc.label=d.name;
-  const t=ac.currentTime;vc.g.gain.cancelScheduledValues(t);vc.g.gain.setTargetAtTime(on?.25:0,t,on?.01:.08);
+  const t=ac.currentTime;vc.g.gain.cancelScheduledValues(t);vc.g.gain.setTargetAtTime(on?.65:0,t,on?.01:.08);
   renderNotes();return;
  }
 }

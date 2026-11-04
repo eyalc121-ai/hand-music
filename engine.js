@@ -9,6 +9,19 @@
   function stepDur() { return 60 / bpm / 4; }
   function loopDur() { return stepDur() * STEPS; }
   function setBpm(next) { bpm = clampBpm(next); syncApi(); }
+  function masterFromPercent(pct) {
+    const p = Math.max(0, Math.min(100, Math.round(Number(pct))));
+    return ((Number.isFinite(p) ? p : 100) / 100) * 1.85;
+  }
+  function makeLimiter(ac) {
+    const lim = ac.createDynamicsCompressor();
+    lim.threshold.value = -1.5;
+    lim.knee.value = 0;
+    lim.ratio.value = 20;
+    lim.attack.value = 0.002;
+    lim.release.value = 0.06;
+    return lim;
+  }
   const DRUMS = {
     R: ["🥁 קיק", "🥁 סנייר", "🥁 האט סגור", "🥁 האט פתוח", "👏 קלאפ"],
     L: ["🥁 טום נמוך", "🥁 טום אמצע", "🥁 טום גבוה", "🥁 קראש", "🥁 קאובל"]
@@ -76,16 +89,17 @@
       return g;
     }
     const drumBus = bus(dest);
+    drumBus.gain.value = 1.7;
     const bandComp = ac.createDynamicsCompressor();
-    bandComp.threshold.value = -18;
-    bandComp.knee.value = 10;
-    bandComp.ratio.value = 2.6;
-    bandComp.attack.value = 0.006;
-    bandComp.release.value = 0.16;
+    bandComp.threshold.value = -16;
+    bandComp.knee.value = 6;
+    bandComp.ratio.value = 3;
+    bandComp.attack.value = 0.004;
+    bandComp.release.value = 0.12;
     const bandDry = ac.createGain();
-    bandDry.gain.value = 0.92;
+    bandDry.gain.value = 1.75;
     const bandWet = ac.createGain();
-    bandWet.gain.value = 0.2;
+    bandWet.gain.value = 0.34;
     const rate = ac.sampleRate || 44100;
     const irLen = Math.floor(rate * 0.9);
     const ir = ac.createBuffer(2, irLen, rate);
@@ -211,7 +225,7 @@
       if (!hand[k]) return;
       const t = ac.currentTime;
       hand[k].gain.cancelScheduledValues(t);
-      hand[k].gain.setTargetAtTime(Math.max(0, Math.min(1, v || 0)), t, 0.05);
+      hand[k].gain.setTargetAtTime(Math.max(0, Math.min(1.5, v || 0)), t, 0.05);
     }
     function setLayer(k, i, on) {
       if (!layers[k] || !layers[k][i]) return;
@@ -235,7 +249,7 @@
       lfo.connect(lg); lg.connect(o.frequency);
       const g = ac.createGain();
       g.gain.setValueAtTime(0.0001, time);
-      g.gain.exponentialRampToValueAtTime(0.11, time + Math.min(0.05, d * 0.25));
+      g.gain.exponentialRampToValueAtTime(0.22, time + Math.min(0.05, d * 0.25));
       g.gain.exponentialRampToValueAtTime(0.0001, time + d);
       o.connect(g); g.connect(layers.L[1]);
       o.start(time); lfo.start(time);
@@ -266,29 +280,29 @@
         }
         if ((bar === 0 || bar === 4) && s === 0) hit("crash", 0.42, time, layers.R[0]);
       }
-      if (layerOn.R[1]) playAt(BASS, s, n => tone(layers.R[1], "sine", midi(chord.r + n[1]), time, sd * n[2], 0.5, 0, 0.004));
-      if (layerOn.R[1] && s === 15 && (bar === 3 || bar === 7)) tone(layers.R[1], "sine", midi(33), time, sd * 0.9, 0.42, 0, 0.004);
+      if (layerOn.R[1]) playAt(BASS, s, n => tone(layers.R[1], "sine", midi(chord.r + n[1]), time, sd * n[2], 0.9, 0, 0.004));
+      if (layerOn.R[1] && s === 15 && (bar === 3 || bar === 7)) tone(layers.R[1], "sine", midi(33), time, sd * 0.9, 0.78, 0, 0.004);
       if (layerOn.R[2]) {
-        if (s === 0) chord.p.forEach(m => tone(layers.R[2], "triangle", midi(m), time, sd * 1.7, 0.11, 0, 0.008));
-        if (s % 4 === 2) chord.p.forEach(m => tone(layers.R[2], "triangle", midi(m + 12), time, sd * 0.85, 0.08, 0, 0.005));
-        if (s === 11 && bar % 2 === 1) chord.g.forEach(m => tone(layers.R[2], "triangle", midi(m), time, sd * 0.7, 0.07, 0, 0.005));
+        if (s === 0) chord.p.forEach(m => tone(layers.R[2], "triangle", midi(m), time, sd * 1.7, 0.24, 0, 0.008));
+        if (s % 4 === 2) chord.p.forEach(m => tone(layers.R[2], "triangle", midi(m + 12), time, sd * 0.85, 0.18, 0, 0.005));
+        if (s === 11 && bar % 2 === 1) chord.g.forEach(m => tone(layers.R[2], "triangle", midi(m), time, sd * 0.7, 0.16, 0, 0.005));
       }
       if (layerOn.R[3]) {
-        if (s % 4 === 0) chord.g.forEach((m, n) => tone(layers.R[3], "triangle", midi(m), time + n * 0.012, sd * 1.25, s === 0 ? 0.1 : 0.07, 0, 0.004));
-        if (s === 3 || s === 7 || s === 11 || s === 15) tone(layers.R[3], "triangle", midi(chord.g[(s / 4) | 0] || chord.g[0]), time, sd * 0.7, 0.08, midi(chord.g[0]), 0.004);
+        if (s % 4 === 0) chord.g.forEach((m, n) => tone(layers.R[3], "triangle", midi(m), time + n * 0.012, sd * 1.25, s === 0 ? 0.22 : 0.16, 0, 0.004));
+        if (s === 3 || s === 7 || s === 11 || s === 15) tone(layers.R[3], "triangle", midi(chord.g[(s / 4) | 0] || chord.g[0]), time, sd * 0.7, 0.18, midi(chord.g[0]), 0.004);
       }
-      if (layerOn.R[4] && s === 0) chord.p.forEach(m => shaped(layers.R[4], "sawtooth", midi(m), time, sd * 15.2, 0.055, "lowpass", bar >= 4 ? 1600 : 1100));
-      if (layerOn.L[0]) playAt(LEAD[bar], s, n => shaped(layers.L[0], "square", midi(n[1]), time, sd * n[2] * 0.92, 0.1, "lowpass", 2100));
+      if (layerOn.R[4] && s === 0) chord.p.forEach(m => shaped(layers.R[4], "sawtooth", midi(m), time, sd * 15.2, 0.13, "lowpass", bar >= 4 ? 1600 : 1100));
+      if (layerOn.L[0]) playAt(LEAD[bar], s, n => shaped(layers.L[0], "square", midi(n[1]), time, sd * n[2] * 0.92, 0.22, "lowpass", 2100));
       if (layerOn.L[1]) playAt(FLUTE[bar], s, n => flute(midi(n[1]), time, sd * n[2] * 0.95));
       if (layerOn.L[2] && (s % 2 === 0 || s === 3 || s === 11)) {
         const toneIdx = (s + bar) % 3;
         const hi = chord.g[toneIdx] + (s >= 8 ? 12 : 0);
-        tone(layers.L[2], "sine", midi(hi), time, sd * 0.95, s % 4 === 0 ? 0.2 : 0.13, midi(hi - 12), 0.004);
+        tone(layers.L[2], "sine", midi(hi), time, sd * 0.95, s % 4 === 0 ? 0.38 : 0.26, midi(hi - 12), 0.004);
       }
-      if (layerOn.L[3] && (s === 4 || s === 12 || (s === 14 && bar % 2 === 1))) chord.p.forEach(m => shaped(layers.L[3], "sawtooth", midi(m + 12), time, sd * 1.05, 0.1, "bandpass", 980));
+      if (layerOn.L[3] && (s === 4 || s === 12 || (s === 14 && bar % 2 === 1))) chord.p.forEach(m => shaped(layers.L[3], "sawtooth", midi(m + 12), time, sd * 1.05, 0.22, "bandpass", 980));
       if (layerOn.L[4] && s === 0) chord.g.forEach(m => {
-        tone(layers.L[4], "sine", midi(m), time, sd * 15.4, 0.045, 0, 0.28);
-        tone(layers.L[4], "sine", midi(m) * 1.004, time, sd * 15.4, 0.035, 0, 0.32);
+        tone(layers.L[4], "sine", midi(m), time, sd * 15.4, 0.11, 0, 0.28);
+        tone(layers.L[4], "sine", midi(m) * 1.004, time, sd * 15.4, 0.09, 0, 0.32);
       });
     }
     function align(pos) {
@@ -372,7 +386,7 @@
     };
   }
 
-  const api = { BPM: bpm, STEP: stepDur(), STEPS: STEPS, LOOP: loopDur(), DRUMS: DRUMS, BAND: BAND, risingHits: risingHits, createEngine: createEngine, setBpm: setBpm };
+  const api = { BPM: bpm, STEP: stepDur(), STEPS: STEPS, LOOP: loopDur(), DRUMS: DRUMS, BAND: BAND, risingHits: risingHits, createEngine: createEngine, setBpm: setBpm, masterFromPercent: masterFromPercent, makeLimiter: makeLimiter };
   function syncApi() { api.BPM = bpm; api.STEP = stepDur(); api.LOOP = loopDur(); api.STEPS = STEPS; }
   syncApi();
   root.HM = api;
