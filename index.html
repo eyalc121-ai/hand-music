@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>נגן ידיים</title>
+<style>
+body{margin:0;background:#0b0f1a;color:#e6e9f2;font-family:system-ui,"Segoe UI",Arial;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+h1{margin:16px 0 4px;background:linear-gradient(90deg,#7dd3fc,#c084fc);-webkit-background-clip:text;color:transparent}
+p.sub{margin:0 0 12px;color:#8b93a7}
+#wrap{position:relative;display:flex;gap:16px;align-items:stretch}
+#stage{position:relative;width:800px;max-width:90vw;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:#111827;box-shadow:0 10px 40px #0008}
+video,canvas#c{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+#ladder{width:90px;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;background:#111827}
+#ladder div{flex:1;display:flex;align-items:center;justify-content:center;font-size:13px;border-bottom:1px solid #1f2937;transition:.1s}
+
+#ladder div.play{background:#22c55e}
+#hud{display:flex;gap:16px;margin:14px;flex-wrap:wrap;justify-content:center}
+.card{background:#111827;padding:10px 18px;border-radius:12px;min-width:120px;text-align:center}
+.card b{display:block;font-size:26px;color:#a5b4fc}
+button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:linear-gradient(90deg,#6366f1,#a855f7);color:#fff;cursor:pointer;margin:8px}
+#overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0b0f1aee;z-index:5;text-align:center;padding:20px}
+.help{max-width:800px;color:#9ca3af;line-height:1.7;font-size:14px}
+</style>
+</head>
+<body>
+<h1>🎵 נגן ידיים</h1>
+<p class="sub">שלוט בתווים באמצעות תנועות הידיים מול המצלמה</p>
+<div id="wrap">
+  <div id="stage">
+    <video id="v" playsinline muted></video><canvas id="c"></canvas>
+    <div id="overlay"><button id="start">▶ התחל</button><div id="status">נדרשת הרשאה למצלמה ולשמע</div></div>
+  </div>
+</div>
+<div id="hud">
+  <div class="card">יד שמאל<div class="keys" id="kl"></div><small id="vl">עוצמה –</small></div>
+  <div class="card">יד ימין<div class="keys" id="kr"></div><small id="vr">עוצמה –</small></div>
+</div>
+<div class="help">🖐️ כל אצבע פתוחה מנגנת תו, סגירת האצבע עוצרת אותו.<br>
+<b>יד ימין</b> (אגודל→זרת): דו רה מי פה סול · <b>יד שמאל</b>: סול לה סי דו רה (אוקטבה גבוהה).<br>
+פתיחת כף היד הכוללת קובעת את העוצמה של אותה יד.</div>
+<style>.keys{display:flex;gap:6px;margin:8px 0}.keys div{width:56px;padding:10px 0;border-radius:10px;background:#1f2937;font-size:13px;transition:.1s}.keys div.on{background:#22c55e;color:#06210f;font-weight:bold;box-shadow:0 0 16px #22c55e}</style>
+<script>
+let HandLandmarker,FilesetResolver,DrawingUtils;
+window.addEventListener("error",e=>{const s=document.getElementById("status");if(s)s.textContent="שגיאה: "+e.message});
+const FING=["אגודל","מורה","אמה","קמיצה","זרת"],TIPS=[4,8,12,16,20],PIPS=[3,6,10,14,18];
+const N={R:[["דו C4",261.63],["רה D4",293.66],["מי E4",329.63],["פה F4",349.23],["סול G4",392]],
+         L:[["סול G4",392],["לה A4",440],["סי B4",493.88],["דו C5",523.25],["רה D5",587.33]]};
+const $=id=>document.getElementById(id),v=$("v"),c=$("c"),ctx=c.getContext("2d");
+const ui={};for(const k of["R","L"]){const box=$(k==="R"?"kr":"kl");ui[k]=N[k].map((x,i)=>{const d=document.createElement("div");d.innerHTML=FING[i]+"<br>"+x[0];box.appendChild(d);return d});}
+let lm,ac,voices={},hg={};
+function audio(){ac=new AudioContext();const comp=ac.createDynamicsCompressor();comp.connect(ac.destination);
+ for(const k of["R","L"]){hg[k]=ac.createGain();hg[k].gain.value=0;hg[k].connect(comp);
+  voices[k]=N[k].map(([,f])=>{const o=ac.createOscillator();o.type="triangle";o.frequency.value=f;const g=ac.createGain();g.gain.value=0;o.connect(g).connect(hg[k]);o.start();return{g,on:false}});}}
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function fingers(h){const w=h[0],s=dist(w,h[9]);
+ return TIPS.map((t,i)=>i===0?dist(h[4],h[17])>dist(h[3],h[17])*1.1&&dist(h[4],h[5])/s>.45:dist(h[t],w)>dist(h[PIPS[i]],w)*1.1);}
+function openness(h){const s=dist(h[0],h[9]);const sp=TIPS.reduce((a,k)=>a+dist(h[k],h[0]),0)/5/s;return Math.min(1,Math.max(0,(sp-.9)/1.0));}
+const btn=$("start"),st=$("status");
+function say(m,err){st.textContent=m;st.style.color=err?"#f87171":"#cbd5e1";console.log("[status]",m)}
+btn.onclick=async()=>{
+ btn.disabled=true;btn.textContent="⏳ מתחיל...";
+ const fail=(m,e,hint)=>{console.error(e);say("❌ "+m+": "+(e&&e.message||e)+(hint?" — "+hint:""),true);btn.disabled=false;btn.textContent="↻ נסה שוב";};
+ try{say("מפעיל שמע...");audio();await ac.resume();}catch(e){return fail("שגיאת שמע",e)}
+ try{say("טוען ספריית זיהוי ידיים...");
+  const m=await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs");
+  ({HandLandmarker,FilesetResolver,DrawingUtils}=m);
+ }catch(e){return fail("טעינת הספרייה נכשלה",e,"בדוק חיבור לאינטרנט, או פתח דרך שרת מקומי (python3 -m http.server)")}
+ try{say("טוען מודל...");
+  const fs=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  const opts=d=>({baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",delegate:d},runningMode:"VIDEO",numHands:2});
+  try{lm=await HandLandmarker.createFromOptions(fs,opts("GPU"))}catch(e){console.warn("GPU failed, using CPU",e);lm=await HandLandmarker.createFromOptions(fs,opts("CPU"))}
+ }catch(e){return fail("טעינת המודל נכשלה",e,"בדוק חיבור לאינטרנט")}
+ try{say("מבקש גישה למצלמה...");
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error("הדפדפן חוסם מצלמה בהקשר הזה");
+  v.srcObject=await navigator.mediaDevices.getUserMedia({video:{width:1280,height:960}});await v.play();
+ }catch(e){return fail("אין גישה למצלמה",e,"אשר הרשאת מצלמה בסרגל הכתובת, וודא שאף אפליקציה אחרת לא משתמשת בה")}
+ say("✅ פועל");$("overlay").style.display="none";loop();
+};
+let last=-1;
+function loop(){
+ if(v.currentTime!==last){last=v.currentTime;c.width=v.videoWidth;c.height=v.videoHeight;
+  const r=lm.detectForVideo(v,performance.now());ctx.clearRect(0,0,c.width,c.height);const du=new DrawingUtils(ctx);
+  const seen={R:null,L:null};
+  r.landmarks.forEach((h,i)=>{const k=r.handedness[i][0].categoryName==="Left"?"R":"L"; // selfie cam: label is mirrored
+   seen[k]=h;du.drawConnectors(h,HandLandmarker.HAND_CONNECTIONS,{color:k==="R"?"#a855f7":"#38bdf8",lineWidth:4});
+   const f=fingers(h);TIPS.forEach((t,j)=>du.drawLandmarks([h[t]],{color:f[j]?"#22c55e":"#ef4444",radius:9}));});
+  const t=ac.currentTime;
+  for(const k of["R","L"]){const h=seen[k],f=h?fingers(h):[0,0,0,0,0],op=h?openness(h):0;
+   hg[k].gain.setTargetAtTime(h?.15+.6*op:0,t,.05);$(k==="R"?"vr":"vl").textContent=h?"עוצמה "+Math.round(op*100)+"%":"עוצמה –";
+   voices[k].forEach((vc,j)=>{const on=!!f[j];if(on!==vc.on){vc.on=on;vc.g.gain.cancelScheduledValues(t);vc.g.gain.setTargetAtTime(on?.25:0,t,on?.01:.08);ui[k][j].className=on?"on":"";}});}
+ }
+ requestAnimationFrame(loop);
+}
+</script>
+</body></html>
