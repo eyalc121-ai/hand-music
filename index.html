@@ -22,6 +22,9 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
 .help{max-width:800px;color:#9ca3af;line-height:1.7;font-size:14px}
 #mode{margin:0 0 12px;padding:8px 18px;border-radius:999px;background:#14532d;color:#86efac;font-weight:700;font-size:18px}
 #mode.paused{background:#7f1d1d;color:#fecaca}
+#inst{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap;justify-content:center}
+#inst button{font-size:16px;padding:8px 16px;margin:0;background:#1f2937;color:#cbd5e1}
+#inst button.on{background:linear-gradient(90deg,#6366f1,#a855f7);color:#fff}
 #cast{display:flex;flex-direction:column;align-items:center;gap:8px;margin:4px 16px 12px;padding:14px 18px;background:#111827;border-radius:16px;max-width:min(520px,92vw);text-align:center}
 #cast[hidden]{display:none}
 #qr{background:#fff;padding:8px;border-radius:12px}
@@ -35,6 +38,11 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
 <h1>🎵 נגן ידיים</h1>
 <p class="sub">שלוט בתווים באמצעות תנועות הידיים מול המצלמה</p>
 <div id="mode">▶ מנגן</div>
+<div id="inst">
+  <button type="button" id="bn">🎵 תווים</button>
+  <button type="button" id="bd">🥁 תופים</button>
+  <button type="button" id="bb">🎼 תזמורת</button>
+</div>
 <div id="wrap">
   <div id="stage">
     <video id="v" playsinline muted></video><canvas id="c"></canvas>
@@ -57,9 +65,12 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
 <div class="help">🖐️ כל אצבע פתוחה מנגנת תו, סגירת האצבע עוצרת אותו.<br>
 <b>יד ימין</b> (אגודל→זרת): דו רה מי פה סול · <b>יד שמאל</b>: סול לה סי דו רה (אוקטבה גבוהה).<br>
 פתיחת כף היד הכוללת קובעת את העוצמה של אותה יד.<br>
+במצב «🥁 תופים» פתיחת אצבע מקישה פעם אחת. ימין: קיק, סנייר, האט סגור, האט פתוח, קלאפ. שמאל: טום נמוך, טום אמצע, טום גבוה, קראש, קאובל.<br>
+במצב «🎼 תזמורת» כל אצבע מוסיפה כלי ללופ משותף (100 BPM, ארבעה תיבות בדו מז'ור). ימין: קצב, בס, פסנתר, גיטרה, מיתרים. שמאל: ליד, חליל, מרימבה, נשיפה, מקהלה. סגירה מורידה את הכלי, ופתיחת כף היד קובעת את עוצמת היד. הבחירה נשמרת בדפדפן.<br>
 מחאו כפיים — קרבו את מרכזי שתי כפות הידיים — כדי להשהות את הנגינה, ומחאו שוב כדי להמשיך.<br>
 אחרי «התחל» מופיע קוד QR לכתובת הרמקול בטלפון. «השמע גם במחשב» (פעיל כברירת מחדל) קובע אם התווים נשמעים גם כאן.</div>
-<style>.keys{display:flex;gap:6px;margin:8px 0}.keys div{width:56px;padding:10px 0;border-radius:10px;background:#1f2937;font-size:13px;transition:.1s}.keys div.on{background:#22c55e;color:#06210f;font-weight:bold;box-shadow:0 0 16px #22c55e}</style>
+<style>.keys{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap;justify-content:center}.keys div{width:76px;padding:10px 0;border-radius:10px;background:#1f2937;font-size:12px;line-height:1.25;transition:.1s}.keys div.on{background:#22c55e;color:#06210f;font-weight:bold;box-shadow:0 0 16px #22c55e}.keys div.hit{background:#f59e0b;color:#1c1003;font-weight:bold;box-shadow:0 0 16px #f59e0b}</style>
+<script src="engine.js"></script>
 <script>
 let HandLandmarker,FilesetResolver,DrawingUtils;
 window.addEventListener("error",e=>{const s=document.getElementById("status");if(s)s.textContent="שגיאה: "+e.message});
@@ -68,10 +79,24 @@ const N={R:[["דו C4",261.63],["רה D4",293.66],["מי E4",329.63],["פה F4",
          L:[["סול G4",392],["לה A4",440],["סי B4",493.88],["דו C5",523.25],["רה D5",587.33]]};
 const $=id=>document.getElementById(id),v=$("v"),c=$("c"),ctx=c.getContext("2d");
 const ui={};for(const k of["R","L"]){const box=$(k==="R"?"kr":"kl");ui[k]=N[k].map((x,i)=>{const d=document.createElement("div");d.innerHTML=FING[i]+"<br>"+x[0];box.appendChild(d);return d});}
-let lm,ac,voices={},hg={};
-function audio(){ac=new AudioContext();const comp=ac.createDynamicsCompressor();comp.connect(ac.destination);
- for(const k of["R","L"]){hg[k]=ac.createGain();hg[k].gain.value=0;hg[k].connect(comp);
-  voices[k]=N[k].map(([,f])=>{const o=ac.createOscillator();o.type="triangle";o.frequency.value=f;const g=ac.createGain();g.gain.value=0;o.connect(g).connect(hg[k]);o.start();return{g,on:false}});}}
+let lm,ac,voices={},hg={},master,engine;
+const MODES=["notes","drums","band"];
+let playMode="notes";
+try{const saved=localStorage.getItem("handmusic-mode");if(MODES.includes(saved))playMode=saved;}catch(e){}
+let clockOrigin=0,clockHold=false,clockPausedAt=0;
+function loopPos(now){now=now||Date.now();if(clockHold)return clockPausedAt;if(!clockOrigin)clockOrigin=now;
+ let s=((now-clockOrigin)/1000)%(typeof HM!=="undefined"?HM.LOOP:9.6);if(s<0)s+=typeof HM!=="undefined"?HM.LOOP:9.6;return s;}
+function pauseClock(){if(clockHold)return;clockPausedAt=loopPos();clockHold=true;}
+function resumeClock(){if(!clockHold)return;clockOrigin=Date.now()-clockPausedAt*1000;clockHold=false;}
+function audio(){ac=new AudioContext();master=ac.createDynamicsCompressor();master.connect(ac.destination);
+ for(const k of["R","L"]){hg[k]=ac.createGain();hg[k].gain.value=0;hg[k].connect(master);
+  voices[k]=N[k].map(([,f])=>{const o=ac.createOscillator();o.type="triangle";o.frequency.value=f;const g=ac.createGain();g.gain.value=0;o.connect(g).connect(hg[k]);o.start();return{g,on:false}});}
+ if(typeof HM==="undefined"){castErr("מנוע הצליל לא נטען. רעננו את הדף.");return;}
+ clockOrigin=Date.now();
+ engine=HM.createEngine(ac,master,loopPos);
+ if(playMode==="band")engine.setEnabled(true);
+ setInterval(()=>{if(playMode==="band")broadcastSync();},2000);
+}
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const palm=h=>({x:(h[0].x+h[9].x)/2,y:(h[0].y+h[9].y)/2});
 const CLAP_RATIO=1.15,CLAP_MS=800;
@@ -81,7 +106,8 @@ function showMode(){mode.textContent=paused?"⏸ מושהה — מחא כפיי�
 function silence(){const t=ac.currentTime;
  for(const k of["R","L"]){hg[k].gain.cancelScheduledValues(t);hg[k].gain.setValueAtTime(0,t);
   voices[k].forEach((vc,j)=>{vc.on=false;vc.g.gain.cancelScheduledValues(t);vc.g.gain.setValueAtTime(0,t);ui[k][j].className="";});
-  $(k==="R"?"vr":"vl").textContent="עוצמה –";}}
+  $(k==="R"?"vr":"vl").textContent="עוצמה –";}
+ if(engine)engine.stopAll();}
 let localOn=true,peer=null,castTries=0;
 const conns=new Set(),sentVol={R:null,L:null},volAt={R:0,L:0};
 function castErr(m){const e=$("casterr");if(e)e.textContent=m;console.error(m);}
@@ -94,11 +120,16 @@ function broadcast(msg){
 function sendVol(k,v){const q=Math.round(v*50)/50,now=performance.now();
  if(sentVol[k]===q)return;if(q!==0&&now-volAt[k]<50)return;
  sentVol[k]=q;volAt[k]=now;broadcast({t:"vol",hand:k,v:q});}
+function broadcastSync(){if(!clockOrigin||typeof HM==="undefined")return;
+ broadcast({t:"sync",origin:clockOrigin,hostNow:Date.now(),pos:loopPos(),paused:paused?1:0,bpm:HM.BPM,step:HM.STEP,steps:HM.STEPS});}
 function sendState(conn){
- try{conn.send({t:paused?"pause":"resume"});
+ try{conn.send({t:"sync",origin:clockOrigin,hostNow:Date.now(),pos:loopPos(),paused:paused?1:0,bpm:HM.BPM,step:HM.STEP,steps:HM.STEPS});
+  conn.send({t:paused?"pause":"resume"});
+  conn.send({t:"mode",mode:playMode});
   if(paused){conn.send({t:"stopAll"});return;}
   for(const k of["R","L"]){if(sentVol[k]!=null)conn.send({t:"vol",hand:k,v:sentVol[k]});
-   voices[k].forEach((vc,j)=>{if(vc.on)conn.send({t:"noteOn",hand:k,i:j,freq:N[k][j][1],name:N[k][j][0]});});}
+   if(playMode==="notes")voices[k].forEach((vc,j)=>{if(vc.on)conn.send({t:"noteOn",hand:k,i:j,freq:N[k][j][1],name:N[k][j][0]});});
+   if(playMode==="band"&&engine)for(let j=0;j<5;j++)if(engine.layerOn[k][j])conn.send({t:"layer",hand:k,i:j,on:1,name:HM.BAND[k][j]});}
  }catch(e){castErr("שליחת המצב לרמקול נכשלה: "+(e&&e.message||e));}
 }
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=()=>res();s.onerror=()=>rej(new Error(src));document.head.appendChild(s);});}
@@ -114,6 +145,9 @@ function openPeer(id){
  });
  peer.on("connection",conn=>{
   conn.on("open",()=>{conns.add(conn);updateCount();sendState(conn);});
+  conn.on("data",d=>{try{if(!d||d.t!=="ping"||typeof HM==="undefined")return;
+   conn.send({t:"pong",t:d.t,n:d.n,hostNow:Date.now(),origin:clockOrigin,pos:loopPos(),paused:paused?1:0,bpm:HM.BPM,step:HM.STEP,steps:HM.STEPS});
+  }catch(e){castErr("תשובת שעון נכשלה: "+(e&&e.message||e));}});
   conn.on("close",()=>{conns.delete(conn);updateCount();});
   conn.on("error",e=>{conns.delete(conn);updateCount();castErr("שגיאת רמקול: "+(e&&e.message||e));});
  });
@@ -134,10 +168,11 @@ async function startCast(){
 }
 $("localplay").addEventListener("change",()=>{
  localOn=$("localplay").checked;if(!ac)return;const t=ac.currentTime;
+ if(engine)engine.setLocal(localOn);
  for(const k of["R","L"]){hg[k].gain.cancelScheduledValues(t);
   if(localOn)hg[k].gain.setTargetAtTime(sentVol[k]||0,t,.05);else hg[k].gain.setValueAtTime(0,t);
   voices[k].forEach(vc=>{vc.g.gain.cancelScheduledValues(t);
-   if(localOn&&vc.on)vc.g.gain.setTargetAtTime(.25,t,.01);else vc.g.gain.setValueAtTime(0,t);});}
+   if(localOn&&vc.on&&playMode==="notes")vc.g.gain.setTargetAtTime(.25,t,.01);else vc.g.gain.setValueAtTime(0,t);});}
 });
 function fingers(h){const w=h[0],s=dist(w,h[9]);
  return TIPS.map((t,i)=>i===0?dist(h[4],h[17])>dist(h[3],h[17])*1.1&&dist(h[4],h[5])/s>.45:dist(h[t],w)>dist(h[PIPS[i]],w)*1.1);}
@@ -174,24 +209,46 @@ function loop(){
   if(seen.R&&seen.L){const s=(dist(seen.R[0],seen.R[9])+dist(seen.L[0],seen.L[9]))/2;
    const close=s>0&&dist(palm(seen.R),palm(seen.L))<s*CLAP_RATIO,nowMs=performance.now();
    if(close&&!clapHeld&&nowMs-clapAt>=CLAP_MS){clapHeld=true;clapAt=nowMs;paused=!paused;
-    if(paused){silence();broadcast({t:"pause"});broadcast({t:"stopAll"});}
-    else{sentVol.R=sentVol.L=null;broadcast({t:"resume"});}
+    if(paused){pauseClock();silence();broadcast({t:"pause"});broadcast({t:"stopAll"});}
+    else{resumeClock();sentVol.R=sentVol.L=null;if(engine&&playMode==="band")engine.setEnabled(true);broadcast({t:"resume"});broadcastSync();}
     showMode();}
    else if(!close)clapHeld=false;
   }
-  const t=ac.currentTime;
-  if(!paused){
+  const t=ac.currentTime,hitNow=performance.now();
   for(const k of["R","L"]){const h=seen[k],f=h?fingers(h):[0,0,0,0,0],op=h?openness(h):0;
-   const vol=h?.15+.6*op:0;if(localOn)hg[k].gain.setTargetAtTime(vol,t,.05);
-   $(k==="R"?"vr":"vl").textContent=h?"עוצמה "+Math.round(op*100)+"%":"עוצמה –";sendVol(k,vol);
-   voices[k].forEach((vc,j)=>{const on=!!f[j];if(on!==vc.on){vc.on=on;
-    if(localOn){vc.g.gain.cancelScheduledValues(t);vc.g.gain.setTargetAtTime(on?.25:0,t,on?.01:.08);}
-    ui[k][j].className=on?"on":"";
-    broadcast(on?{t:"noteOn",hand:k,i:j,freq:N[k][j][1],name:N[k][j][0]}:{t:"noteOff",hand:k,i:j,freq:N[k][j][1]});}});
+   if(!paused)$(k==="R"?"vr":"vl").textContent=h?"עוצמה "+Math.round(op*100)+"%":"עוצמה –";
+   if(!paused&&playMode==="notes"){const vol=h?.15+.6*op:0;if(localOn)hg[k].gain.setTargetAtTime(vol,t,.05);sendVol(k,vol);
+    voices[k].forEach((vc,j)=>{const on=!!f[j];if(on!==vc.on){vc.on=on;
+     if(localOn){vc.g.gain.cancelScheduledValues(t);vc.g.gain.setTargetAtTime(on?.25:0,t,on?.01:.08);}
+     ui[k][j].className=on?"on":"";
+     broadcast(on?{t:"noteOn",hand:k,i:j,freq:N[k][j][1],name:N[k][j][0]}:{t:"noteOff",hand:k,i:j,freq:N[k][j][1]});}});}
+   else if(!paused&&playMode==="drums"&&primed&&typeof HM!=="undefined"){const hv=Math.round((0.18+0.82*op)*100)/100;
+    for(const j of HM.risingHits(held[k],f,drumAt[k],hitNow,120)){drumAt[k][j]=hitNow;
+     if(localOn&&engine)engine.triggerDrum(k,j,hv);flash(ui[k][j]);
+     broadcast({t:"drum",hand:k,i:j,vol:hv,name:HM.DRUMS[k][j]});}}
+   else if(!paused&&playMode==="band"&&engine){const vol=h?.15+.6*op:0;engine.setHand(k,localOn?vol:0);sendVol(k,vol);
+    for(let j=0;j<5;j++){const on=!!f[j];if((engine.layerOn[k][j]?1:0)!==(on?1:0)){engine.setLayer(k,j,on);
+     ui[k][j].className=on?"on":"";broadcast({t:"layer",hand:k,i:j,on:on?1:0,name:HM.BAND[k][j]});}}}
+   for(let j=0;j<5;j++)held[k][j]=f[j]?1:0;
   }
-  }
+  primed=true;
  }
  requestAnimationFrame(loop);
 }
+const held={R:[0,0,0,0,0],L:[0,0,0,0,0]},drumAt={R:[0,0,0,0,0],L:[0,0,0,0,0]};
+let primed=false;
+function flash(el){el.classList.add("hit");setTimeout(()=>el.classList.remove("hit"),140);}
+function labelFor(k,i){if(playMode==="drums"&&typeof HM!=="undefined")return HM.DRUMS[k][i];if(playMode==="band"&&typeof HM!=="undefined")return HM.BAND[k][i];return N[k][i][0];}
+function applyLabels(){for(const k of["R","L"])ui[k].forEach((el,i)=>{el.innerHTML=FING[i]+"<br>"+labelFor(k,i);el.className="";});
+ $("bn").classList.toggle("on",playMode==="notes");$("bd").classList.toggle("on",playMode==="drums");$("bb").classList.toggle("on",playMode==="band");}
+function setPlayMode(m){if(!MODES.includes(m)||m===playMode)return;playMode=m;
+ try{localStorage.setItem("handmusic-mode",m);}catch(e){}
+ if(ac){silence();broadcast({t:"stopAll"});broadcast({t:"mode",mode:m});if(m==="band"&&engine&&!paused){engine.setEnabled(true);broadcastSync();}}
+ else if(typeof HM==="undefined"&&m!=="notes")castErr("מנוע הצליל לא נטען. רעננו את הדף.");
+ applyLabels();}
+applyLabels();
+$("bn").onclick=()=>setPlayMode("notes");
+$("bd").onclick=()=>setPlayMode("drums");
+$("bb").onclick=()=>setPlayMode("band");
 </script>
 </body></html>
