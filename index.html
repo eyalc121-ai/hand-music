@@ -20,11 +20,14 @@ video,canvas#c{position:absolute;inset:0;width:100%;height:100%;object-fit:cover
 button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:linear-gradient(90deg,#6366f1,#a855f7);color:#fff;cursor:pointer;margin:8px}
 #overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0b0f1aee;z-index:5;text-align:center;padding:20px}
 .help{max-width:800px;color:#9ca3af;line-height:1.7;font-size:14px}
+#mode{margin:0 0 12px;padding:8px 18px;border-radius:999px;background:#14532d;color:#86efac;font-weight:700;font-size:18px}
+#mode.paused{background:#7f1d1d;color:#fecaca}
 </style>
 </head>
 <body>
 <h1>🎵 נגן ידיים</h1>
 <p class="sub">שלוט בתווים באמצעות תנועות הידיים מול המצלמה</p>
+<div id="mode">▶ מנגן</div>
 <div id="wrap">
   <div id="stage">
     <video id="v" playsinline muted></video><canvas id="c"></canvas>
@@ -37,7 +40,8 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
 </div>
 <div class="help">🖐️ כל אצבע פתוחה מנגנת תו, סגירת האצבע עוצרת אותו.<br>
 <b>יד ימין</b> (אגודל→זרת): דו רה מי פה סול · <b>יד שמאל</b>: סול לה סי דו רה (אוקטבה גבוהה).<br>
-פתיחת כף היד הכוללת קובעת את העוצמה של אותה יד.</div>
+פתיחת כף היד הכוללת קובעת את העוצמה של אותה יד.<br>
+מחאו כפיים — קרבו את מרכזי שתי כפות הידיים — כדי להשהות את הנגינה, ומחאו שוב כדי להמשיך.</div>
 <style>.keys{display:flex;gap:6px;margin:8px 0}.keys div{width:56px;padding:10px 0;border-radius:10px;background:#1f2937;font-size:13px;transition:.1s}.keys div.on{background:#22c55e;color:#06210f;font-weight:bold;box-shadow:0 0 16px #22c55e}</style>
 <script>
 let HandLandmarker,FilesetResolver,DrawingUtils;
@@ -52,6 +56,15 @@ function audio(){ac=new AudioContext();const comp=ac.createDynamicsCompressor();
  for(const k of["R","L"]){hg[k]=ac.createGain();hg[k].gain.value=0;hg[k].connect(comp);
   voices[k]=N[k].map(([,f])=>{const o=ac.createOscillator();o.type="triangle";o.frequency.value=f;const g=ac.createGain();g.gain.value=0;o.connect(g).connect(hg[k]);o.start();return{g,on:false}});}}
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const palm=h=>({x:(h[0].x+h[9].x)/2,y:(h[0].y+h[9].y)/2});
+const CLAP_RATIO=1.15,CLAP_MS=800;
+let paused=false,clapAt=0,clapHeld=false;
+const mode=$("mode");
+function showMode(){mode.textContent=paused?"⏸ מושהה — מחא כפיים להמשך":"▶ מנגן";mode.className=paused?"paused":"";}
+function silence(){const t=ac.currentTime;
+ for(const k of["R","L"]){hg[k].gain.cancelScheduledValues(t);hg[k].gain.setValueAtTime(0,t);
+  voices[k].forEach((vc,j)=>{vc.on=false;vc.g.gain.cancelScheduledValues(t);vc.g.gain.setValueAtTime(0,t);ui[k][j].className="";});
+  $(k==="R"?"vr":"vl").textContent="עוצמה –";}}
 function fingers(h){const w=h[0],s=dist(w,h[9]);
  return TIPS.map((t,i)=>i===0?dist(h[4],h[17])>dist(h[3],h[17])*1.1&&dist(h[4],h[5])/s>.45:dist(h[t],w)>dist(h[PIPS[i]],w)*1.1);}
 function openness(h){const s=dist(h[0],h[9]);const sp=TIPS.reduce((a,k)=>a+dist(h[k],h[0]),0)/5/s;return Math.min(1,Math.max(0,(sp-.9)/1.0));}
@@ -84,10 +97,18 @@ function loop(){
   r.landmarks.forEach((h,i)=>{const k=r.handedness[i][0].categoryName==="Left"?"R":"L"; // selfie cam: label is mirrored
    seen[k]=h;du.drawConnectors(h,HandLandmarker.HAND_CONNECTIONS,{color:k==="R"?"#a855f7":"#38bdf8",lineWidth:4});
    const f=fingers(h);TIPS.forEach((t,j)=>du.drawLandmarks([h[t]],{color:f[j]?"#22c55e":"#ef4444",radius:9}));});
+  if(seen.R&&seen.L){const s=(dist(seen.R[0],seen.R[9])+dist(seen.L[0],seen.L[9]))/2;
+   const close=s>0&&dist(palm(seen.R),palm(seen.L))<s*CLAP_RATIO,nowMs=performance.now();
+   if(close&&!clapHeld&&nowMs-clapAt>=CLAP_MS){clapHeld=true;clapAt=nowMs;paused=!paused;if(paused)silence();showMode();}
+   else if(!close)clapHeld=false;
+  }
   const t=ac.currentTime;
+  if(!paused){
   for(const k of["R","L"]){const h=seen[k],f=h?fingers(h):[0,0,0,0,0],op=h?openness(h):0;
    hg[k].gain.setTargetAtTime(h?.15+.6*op:0,t,.05);$(k==="R"?"vr":"vl").textContent=h?"עוצמה "+Math.round(op*100)+"%":"עוצמה –";
-   voices[k].forEach((vc,j)=>{const on=!!f[j];if(on!==vc.on){vc.on=on;vc.g.gain.cancelScheduledValues(t);vc.g.gain.setTargetAtTime(on?.25:0,t,on?.01:.08);ui[k][j].className=on?"on":"";}});}
+   voices[k].forEach((vc,j)=>{const on=!!f[j];if(on!==vc.on){vc.on=on;vc.g.gain.cancelScheduledValues(t);vc.g.gain.setTargetAtTime(on?.25:0,t,on?.01:.08);ui[k][j].className=on?"on":"";}});
+  }
+  }
  }
  requestAnimationFrame(loop);
 }
