@@ -17,6 +17,11 @@ button:disabled{opacity:.55;cursor:default}
 #err{color:#f87171;min-height:1.4em;margin-top:12px;text-align:center;max-width:520px}
 #room{color:#7dd3fc;word-break:break-all;font-size:14px}
 #masterRead{margin-top:8px;font-size:22px;font-weight:700;color:#86efac}
+#light{position:fixed;inset:0;z-index:4;display:none;background:#000}
+#light.on{display:block}
+#dock{position:fixed;bottom:12px;left:0;right:0;z-index:6;display:flex;justify-content:center;gap:8px}
+#dock button{font-size:16px;padding:10px 18px;margin:0}
+#torchNote{position:fixed;top:10px;left:12px;right:12px;z-index:6;background:#fff;color:#111;border-radius:12px;padding:8px 12px;text-align:center;font-size:14px}
 </style>
 </head>
 <body>
@@ -25,6 +30,9 @@ button:disabled{opacity:.55;cursor:default}
 <div id="masterRead">עוצמה 100%</div>
 <div id="status">ממתינים להפעלת צליל</div>
 <button id="go">הפעל צליל</button>
+<div id="light"></div>
+<div id="dock"><button id="full" type="button">מסך מלא</button></div>
+<p id="torchNote" hidden>הפנס לא זמין באייפון. ההבהוב על המסך כן עובד. בכרום באנדרואיד אפשר להדליק פנס לפי הקצב.</p>
 <div class="card"><div id="room"></div><div id="notes">אין תווים כרגע</div></div>
 <div id="err"></div>
 <script src="engine.js"></script>
@@ -113,10 +121,14 @@ function applyMsg(d){
   renderNotes();return;}
  if(d.t==="layer"){const k=d.hand,i=d.i|0;if((k!=="R"&&k!=="L")||i<0||i>4)throw new Error("שכבת כלים לא תקינה");
   const on=!!d.on&&!remotePaused;bandOn[k][i]=on?1:0;if(engine)engine.setLayer(k,i,on);renderNotes();return;}
+ if(d.t==="lights"){applyLights(d);return;}
  if(d.t==="drum"){const k=d.hand,i=d.i|0,vol=Number(d.vol);
   if((k!=="R"&&k!=="L")||i<0||i>4||!Number.isFinite(vol))throw new Error("מכת תוף לא תקינה");
   if(remotePaused)return;
-  if(!engine)throw new Error("השמע עוד לא הופעל");engine.triggerDrum(k,i,vol);showHit(d.name||HM.DRUMS[k][i]);return;}
+  if(!engine)throw new Error("השמע עוד לא הופעל");engine.triggerDrum(k,i,vol);
+  if(drumGlow[k])drumGlow[k][i]=performance.now()+220;
+  if((k==="L"&&i===3)||(d.name&&String(d.name).indexOf("קראש")>=0))whiteUntil=performance.now()+180;
+  showHit(d.name||HM.DRUMS[k][i]);return;}
  if(d.t==="vol"){
   if(d.hand!=="R"&&d.hand!=="L"||!Number.isFinite(Number(d.v)))throw new Error("עדכון עוצמה לא תקין");
   volStore[d.hand]=Number(d.v);
@@ -174,6 +186,65 @@ function connect(){
   else lost("שגיאת חיבור: "+(e&&e.message||type||e));
  });
 }
+const COLORS={R:[[239,68,68],[249,115,22],[234,179,8],[34,197,94],[20,184,166]],L:[[59,130,246],[99,102,241],[168,85,247],[236,72,153],[244,63,94]]};
+const drumGlow={R:[0,0,0,0,0],L:[0,0,0,0,0]};
+let lights={on:0,mode:"beat",color:"#7c3aed",flash:0},whiteUntil=0,torchTrack=null,torchState=false,torchBusy=false,torchBlocked=false,lastCrash=0,wakeLock=null;
+function iosDevice(){const ua=navigator.userAgent||"";return /iPad|iPhone|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);}
+function hexRgb(h){const m=/^#([0-9a-f]{6})$/i.exec(h||"");if(!m)return [124,58,237];const n=parseInt(m[1],16);return [(n>>16)&255,(n>>8)&255,n&255];}
+function applyLights(d){if(!d||(d.mode!=="beat"&&d.mode!=="steady"&&d.mode!=="strobe"))throw new Error("מצב תאורה לא מוכר");
+ if(d.color&&!/^#[0-9a-fA-F]{6}$/.test(d.color))throw new Error("צבע תאורה לא תקין");
+ lights={on:d.on?1:0,mode:d.mode,color:d.color||lights.color,flash:d.flash?1:0};
+ if(!lights.on||!lights.flash)setTorch(false);
+ if(lights.on)keepAwake();}
+function beatInfo(){if(!origin||typeof HM==="undefined"||!HM.STEP)return {phase:0,s:0,bar:0,idx:0,into:1};
+ const pos=groovePos(),step=HM.STEP,idx=Math.floor(pos/step),into=pos-idx*step;
+ return {phase:into/(step*4),s:((idx%16)+16)%16,bar:Math.floor(idx/16)%8,idx:idx,into:into/step};}
+function activeRgbs(now){const cols=[];
+ for(const k of ["R","L"])for(let j=0;j<5;j++){
+  const note=remoteMode==="notes"&&voices&&voices[k]&&voices[k][j].on;
+  const layer=(remoteMode==="band"||remoteMode==="orch")&&bandOn[k][j];
+  if(note||layer||drumGlow[k][j]>now)cols.push(COLORS[k][j]);
+ }return cols;}
+function paintLights(now){const el=$("light");if(!lights.on){el.classList.remove("on");return;}
+ el.classList.add("on");
+ const info=beatInfo();
+ if(remoteMode==="band"&&bandOn.R[0]&&(info.bar===0||info.bar===4)&&info.s===0&&info.into<0.35&&info.idx!==lastCrash){lastCrash=info.idx;whiteUntil=now+180;}
+ const pulse=Math.pow(Math.max(0,1-info.phase*3.2),1.7);
+ const vol=Math.max(volStore.R||0,volStore.L||0,0.35)/1.45;
+ const master=Math.max(0.15,masterPct/100);
+ let level=0.9;
+ if(remotePaused)level=0.18;
+ else if(lights.mode==="beat")level=0.22+0.78*pulse;
+ else if(lights.mode==="strobe")level=info.into<0.42?1:0.04;
+ const cols=lights.mode==="steady"?[]:activeRgbs(now);
+ const base=cols.length?cols.reduce((a,c)=>[a[0]+c[0],a[1]+c[1],a[2]+c[2]],[0,0,0]).map(v=>v/cols.length):hexRgb(lights.color);
+ const rgb=now<whiteUntil?[255,255,255]:base;
+ const amp=now<whiteUntil?1:level*Math.min(1,vol*master);
+ el.style.background="rgb("+Math.round(rgb[0]*amp)+","+Math.round(rgb[1]*amp)+","+Math.round(rgb[2]*amp)+")";
+ const want=!!(lights.on&&lights.flash&&!remotePaused&&!torchBlocked&&(lights.mode==="strobe"?info.into<0.42:pulse>0.72));
+ if(want!==torchState)setTorch(want);}
+function lightFrame(now){paintLights(now||performance.now());requestAnimationFrame(lightFrame);}
+async function keepAwake(){try{if(navigator.wakeLock&&document.visibilityState==="visible")wakeLock=await navigator.wakeLock.request("screen");}
+ catch(e){if($("err")&&!$("err").textContent)$("err").textContent="לא הצלחנו להשאיר את המסך דולק.";}}
+function showTorchNote(msg){const n=$("torchNote");if(!n)return;n.hidden=false;n.textContent=msg;}
+async function setTorch(on){if(!on){torchState=false;if(torchTrack){try{await torchTrack.applyConstraints({advanced:[{torch:false}]});}catch(e){}try{torchTrack.stop();}catch(e){}torchTrack=null;}return;}
+ if(torchBlocked||torchBusy||torchState)return;
+ if(iosDevice()){torchBlocked=true;showTorchNote("הפנס לא זמין באייפון. ההבהוב על המסך כן עובד.");return;}
+ torchBusy=true;
+ try{if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error("אין מצלמה");
+  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}});
+  torchTrack=stream.getVideoTracks()[0];
+  const caps=torchTrack.getCapabilities?torchTrack.getCapabilities():{};
+  if(!caps.torch){torchTrack.stop();torchTrack=null;throw new Error("אין פנס במכשיר");}
+  await torchTrack.applyConstraints({advanced:[{torch:true}]});torchState=true;}
+ catch(e){torchBlocked=true;torchState=false;if(torchTrack){try{torchTrack.stop();}catch(err){}torchTrack=null;}
+  showTorchNote("הפנס לא נדלק במכשיר הזה. ההבהוב על המסך כן עובד.");}
+ torchBusy=false;}
+if(iosDevice())showTorchNote("הפנס לא זמין באייפון. ההבהוב על המסך כן עובד. בכרום באנדרואיד אפשר להדליק פנס לפי הקצב.");
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&lights.on)keepAwake();});
+$("full").onclick=async()=>{try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();else await document.exitFullscreen();}
+ catch(e){showErr("מסך מלא לא זמין בדפדפן הזה.");}};
+requestAnimationFrame(lightFrame);
 if(!room)$("room").textContent="חסר מספר חדר בקישור.";
 else $("room").textContent="חדר: "+room;
 $("go").onclick=async()=>{
@@ -185,6 +256,7 @@ $("go").onclick=async()=>{
  catch(e){$("go").disabled=false;showErr("טעינת ספריית החיבור נכשלה. בדקו את האינטרנט.");return;}
  if(typeof Peer!=="function"){$("go").disabled=false;showErr("ספריית החיבור לא נטענה.");return;}
  $("go").textContent="הצליל פעיל";
+ keepAwake();
  connect();
 };
 </script>

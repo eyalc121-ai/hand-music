@@ -24,8 +24,10 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
 #mode.paused{background:#7f1d1d;color:#fecaca}
 #inst{display:flex;gap:8px;margin:0 0 8px;flex-wrap:wrap;justify-content:center}
 #mix{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:0 0 14px}
-#tempoBox,#volBox{display:flex;align-items:center;gap:8px;color:#e6e9f2;font-size:14px}
+#tempoBox,#volBox,#lightBox{display:flex;align-items:center;gap:8px;color:#e6e9f2;font-size:14px}
 #tempo,#masterVol{width:148px;accent-color:#a855f7}
+#lightBox{flex-wrap:wrap;justify-content:center;margin:0 0 14px}
+#lightBox select{background:#111827;color:#e6e9f2;border:0;border-radius:8px;padding:6px 8px}
 #inst button{font-size:16px;padding:8px 16px;margin:0;background:#1f2937;color:#cbd5e1}
 #inst button.on{background:linear-gradient(90deg,#6366f1,#a855f7);color:#fff}
 #cast{display:flex;flex-direction:column;align-items:center;gap:8px;margin:4px 16px 12px;padding:14px 18px;background:#111827;border-radius:16px;max-width:min(520px,92vw);text-align:center}
@@ -55,6 +57,19 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
   <input id="masterVol" type="range" min="0" max="100" step="1" value="100" aria-label="עוצמת שמע">
 </label>
 </div>
+<div id="lightBox">
+  <b>תאורת טלפון</b>
+  <label><input type="checkbox" id="lightsOn" checked> אורות</label>
+  <label>מצב
+    <select id="lightMode" aria-label="מצב תאורה">
+      <option value="beat">לפי הקצב</option>
+      <option value="steady">צבע קבוע</option>
+      <option value="strobe">הבהוב</option>
+    </select>
+  </label>
+  <label>צבע <input type="color" id="lightColor" value="#7c3aed" aria-label="צבע תאורה"></label>
+  <label><input type="checkbox" id="lightFlash"> פנס</label>
+</div>
 <div id="wrap">
   <div id="stage">
     <video id="v" playsinline muted></video><canvas id="c"></canvas>
@@ -78,7 +93,7 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
 <b>יד ימין</b> (אגודל→זרת): דו רה מי פה סול · <b>יד שמאל</b>: סול לה סי דו רה (אוקטבה גבוהה).<br>
 פתיחת כף היד הכוללת קובעת את העוצמה של אותה יד.<br>
 במצב «🥁 תופים» פתיחת אצבע מקישה פעם אחת. ימין: קיק, סנייר, האט סגור, האט פתוח, קלאפ. שמאל: טום נמוך, טום אמצע, טום גבוה, קראש, קאובל.<br>
-במצב «🎼 תזמורת» כל אצבע מוסיפה כלי לגרוב של 122 BPM (אפשר 118–124 במחוון), שמונה תיבות Am–F–C–G: קיק על כל רבע, היי-האט על כל שישה-עשר, סנייר על 2 ו-4, ומילוי כל ארבעה תיבות. ימין: קצב, בס, פסנתר, גיטרה, מיתרים. שמאל: ליד, חליל, מרימבה, נשיפה, מקהלה. סגירה מורידה את הכלי, ופתיחת כף היד קובעת את עוצמת היד. מחוון «עוצמה» (ברירת מחדל גבוהה) חל על המחשב ועל הרמקולים בטלפון. הבחירה נשמרת בדפדפן.<br>
+במצב «🎼 תזמורת» כל אצבע מוסיפה כלי לגרוב של 122 BPM (אפשר 118–124 במחוון), שמונה תיבות Am–F–C–G: קיק על כל רבע, היי-האט על כל שישה-עשר, סנייר על 2 ו-4, ומילוי כל ארבעה תיבות. ימין: קצב, בס, פסנתר, גיטרה, מיתרים. שמאל: ליד, חליל, מרימבה, נשיפה, מקהלה. סגירה מורידה את הכלי, ופתיחת כף היד קובעת את עוצמת היד. מחוון «עוצמה» (ברירת מחדל גבוהה) חל על המחשב ועל הרמקולים בטלפון. «תאורת טלפון» מדליקה את מסך הרמקול: לפי הקצב, צבע קבוע, או הבהוב. הפנס מהבהב לפי הקצב רק בכרום באנדרואיד. הבחירה נשמרת בדפדפן.<br>
 במצב «🎻 פילהרמונית» נפתח קטע תזמורתי נפרד, כ־96 BPM (מחוון 90–100), שמונה תיבות Dm–Bb–F–C. ימין: כינורות I, כינורות II, ויולות, צ'לי, קונטרבס בפיציקטו. שמאל: חליל, אבוב, קרנות, חצוצרות, נבל וטימפני. אולם הקונצרטים מהדהד יותר מהתזמורת.<br>
 מחאו כפיים — קרבו את מרכזי שתי כפות הידיים — כדי להשהות את הנגינה, ומחאו שוב כדי להמשיך.<br>
 אחרי «התחל» מופיע קוד QR לכתובת הרמקול בטלפון. «השמע גם במחשב» (פעיל כברירת מחדל) קובע אם התווים נשמעים גם כאן.</div>
@@ -94,6 +109,14 @@ const $=id=>document.getElementById(id),v=$("v"),c=$("c"),ctx=c.getContext("2d")
 const ui={};for(const k of["R","L"]){const box=$(k==="R"?"kr":"kl");ui[k]=N[k].map((x,i)=>{const d=document.createElement("div");d.innerHTML=FING[i]+"<br>"+x[0];box.appendChild(d);return d});}
 let lm,ac,voices={},hg={},master,engine;
 let masterPct=100;
+let lightsCfg={on:1,mode:"beat",color:"#7c3aed",flash:0};
+try{const raw=JSON.parse(localStorage.getItem("handmusic-lights")||"null");
+ if(raw&&typeof raw==="object"){if(raw.on===0||raw.on===1)lightsCfg.on=raw.on;
+  if(raw.mode==="beat"||raw.mode==="steady"||raw.mode==="strobe")lightsCfg.mode=raw.mode;
+  if(typeof raw.color==="string"&&/^#[0-9a-fA-F]{6}$/.test(raw.color))lightsCfg.color=raw.color;
+  if(raw.flash===0||raw.flash===1)lightsCfg.flash=raw.flash;}}catch(e){}
+function lightsPayload(){return {t:"lights",on:lightsCfg.on,mode:lightsCfg.mode,color:lightsCfg.color,flash:lightsCfg.flash};}
+function pushLights(){try{localStorage.setItem("handmusic-lights",JSON.stringify(lightsCfg));}catch(e){}broadcast(lightsPayload());}
 try{const savedMaster=parseInt(localStorage.getItem("handmusic-master"),10);if(savedMaster>=0&&savedMaster<=100)masterPct=savedMaster;}catch(e){}
 function masterLevel(){return typeof HM!=="undefined"&&HM.masterFromPercent?HM.masterFromPercent(masterPct):(Math.max(0,Math.min(100,masterPct))/100)*1.85;}
 function palmVol(h,op){return h?Math.min(1.45,0.72+0.73*op):0;}
@@ -149,6 +172,7 @@ function sendState(conn){
   conn.send({t:"master",v:masterPct});
   conn.send({t:paused?"pause":"resume"});
   conn.send({t:"mode",mode:playMode});
+  conn.send(lightsPayload());
   if(paused){conn.send({t:"stopAll"});return;}
   for(const k of["R","L"]){if(sentVol[k]!=null)conn.send({t:"vol",hand:k,v:sentVol[k]});
    if(playMode==="notes")voices[k].forEach((vc,j)=>{if(vc.on)conn.send({t:"noteOn",hand:k,i:j,freq:N[k][j][1],name:N[k][j][0]});});
@@ -299,6 +323,11 @@ function setMaster(raw){const n=Math.max(0,Math.min(100,Math.round(Number(raw)||
  if(master&&ac){master.gain.cancelScheduledValues(ac.currentTime);master.gain.setTargetAtTime(masterLevel(),ac.currentTime,0.03);}
  broadcast({t:"master",v:n});}
 if($("masterVol")){$("masterVol").value=String(masterPct);$("volVal").textContent=String(masterPct);$("masterVol").oninput=()=>setMaster($("masterVol").value);}
+if($("lightsOn")){$("lightsOn").checked=!!lightsCfg.on;$("lightMode").value=lightsCfg.mode;$("lightColor").value=lightsCfg.color;$("lightFlash").checked=!!lightsCfg.flash;
+ $("lightsOn").onchange=()=>{lightsCfg.on=$("lightsOn").checked?1:0;pushLights();};
+ $("lightMode").onchange=()=>{lightsCfg.mode=$("lightMode").value;pushLights();};
+ $("lightColor").oninput=()=>{lightsCfg.color=$("lightColor").value;pushLights();};
+ $("lightFlash").onchange=()=>{lightsCfg.flash=$("lightFlash").checked?1:0;pushLights();};}
 applyLabels();
 $("bn").onclick=()=>setPlayMode("notes");
 $("bd").onclick=()=>setPlayMode("drums");
