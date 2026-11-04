@@ -22,6 +22,13 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
 .help{max-width:800px;color:#9ca3af;line-height:1.7;font-size:14px}
 #mode{margin:0 0 12px;padding:8px 18px;border-radius:999px;background:#14532d;color:#86efac;font-weight:700;font-size:18px}
 #mode.paused{background:#7f1d1d;color:#fecaca}
+#cast{display:flex;flex-direction:column;align-items:center;gap:8px;margin:4px 16px 12px;padding:14px 18px;background:#111827;border-radius:16px;max-width:min(520px,92vw);text-align:center}
+#cast[hidden]{display:none}
+#qr{background:#fff;padding:8px;border-radius:12px}
+#casturl{color:#7dd3fc;word-break:break-all;font-size:13px}
+#castcount{font-size:18px;font-weight:700;color:#a5b4fc}
+#cast label{font-size:16px;cursor:pointer}
+#casterr{color:#f87171;min-height:1.2em;font-size:14px}
 </style>
 </head>
 <body>
@@ -38,10 +45,20 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
   <div class="card">יד שמאל<div class="keys" id="kl"></div><small id="vl">עוצמה –</small></div>
   <div class="card">יד ימין<div class="keys" id="kr"></div><small id="vr">עוצמה –</small></div>
 </div>
+<div id="cast" hidden>
+  <b>רמקולים בטלפון</b>
+  <div id="qr"></div>
+  <a id="casturl" target="_blank" rel="noopener"></a>
+  <div id="caststate">פותחים חדר…</div>
+  <div id="castcount">רמקולים מחוברים: 0</div>
+  <label><input type="checkbox" id="localplay" checked> השמע גם במחשב</label>
+  <div id="casterr"></div>
+</div>
 <div class="help">🖐️ כל אצבע פתוחה מנגנת תו, סגירת האצבע עוצרת אותו.<br>
 <b>יד ימין</b> (אגודל→זרת): דו רה מי פה סול · <b>יד שמאל</b>: סול לה סי דו רה (אוקטבה גבוהה).<br>
 פתיחת כף היד הכוללת קובעת את העוצמה של אותה יד.<br>
-מחאו כפיים — קרבו את מרכזי שתי כפות הידיים — כדי להשהות את הנגינה, ומחאו שוב כדי להמשיך.</div>
+מחאו כפיים — קרבו את מרכזי שתי כפות הידיים — כדי להשהות את הנגינה, ומחאו שוב כדי להמשיך.<br>
+אחרי «התחל» מופיע קוד QR לכתובת הרמקול בטלפון. «השמע גם במחשב» (פעיל כברירת מחדל) קובע אם התווים נשמעים גם כאן.</div>
 <style>.keys{display:flex;gap:6px;margin:8px 0}.keys div{width:56px;padding:10px 0;border-radius:10px;background:#1f2937;font-size:13px;transition:.1s}.keys div.on{background:#22c55e;color:#06210f;font-weight:bold;box-shadow:0 0 16px #22c55e}</style>
 <script>
 let HandLandmarker,FilesetResolver,DrawingUtils;
@@ -65,6 +82,63 @@ function silence(){const t=ac.currentTime;
  for(const k of["R","L"]){hg[k].gain.cancelScheduledValues(t);hg[k].gain.setValueAtTime(0,t);
   voices[k].forEach((vc,j)=>{vc.on=false;vc.g.gain.cancelScheduledValues(t);vc.g.gain.setValueAtTime(0,t);ui[k][j].className="";});
   $(k==="R"?"vr":"vl").textContent="עוצמה –";}}
+let localOn=true,peer=null,castTries=0;
+const conns=new Set(),sentVol={R:null,L:null},volAt={R:0,L:0};
+function castErr(m){const e=$("casterr");if(e)e.textContent=m;console.error(m);}
+function updateCount(){const n=[...conns].filter(c=>c.open).length;$("castcount").textContent="רמקולים מחוברים: "+n;}
+function broadcast(msg){
+ for(const c of [...conns]){if(!c.open){conns.delete(c);continue;}
+  try{c.send(msg);}catch(e){castErr("שליחה לרמקול נכשלה: "+(e&&e.message||e));}}
+ updateCount();
+}
+function sendVol(k,v){const q=Math.round(v*50)/50,now=performance.now();
+ if(sentVol[k]===q)return;if(q!==0&&now-volAt[k]<50)return;
+ sentVol[k]=q;volAt[k]=now;broadcast({t:"vol",hand:k,v:q});}
+function sendState(conn){
+ try{conn.send({t:paused?"pause":"resume"});
+  if(paused){conn.send({t:"stopAll"});return;}
+  for(const k of["R","L"]){if(sentVol[k]!=null)conn.send({t:"vol",hand:k,v:sentVol[k]});
+   voices[k].forEach((vc,j)=>{if(vc.on)conn.send({t:"noteOn",hand:k,i:j,freq:N[k][j][1],name:N[k][j][0]});});}
+ }catch(e){castErr("שליחת המצב לרמקול נכשלה: "+(e&&e.message||e));}
+}
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=()=>res();s.onerror=()=>rej(new Error(src));document.head.appendChild(s);});}
+function openPeer(id){
+ try{if(peer){peer.removeAllListeners();peer.destroy();}}catch(e){}
+ try{peer=new Peer(id);}catch(e){castErr("יצירת החדר נכשלה: "+(e&&e.message||e));return;}
+ peer.on("open",rid=>{
+  const url="https://eyalc121-ai.github.io/hand-music/speaker.html?room="+encodeURIComponent(rid);
+  const a=$("casturl");a.textContent=url;a.href=url;$("qr").innerHTML="";
+  try{new QRCode($("qr"),{text:url,width:180,height:180,colorDark:"#0b0f1a",colorLight:"#ffffff"});}
+  catch(e){castErr("יצירת קוד ה־QR נכשלה: "+(e&&e.message||e));}
+  $("caststate").textContent="החדר פתוח. סרקו את הקוד בטלפון.";
+ });
+ peer.on("connection",conn=>{
+  conn.on("open",()=>{conns.add(conn);updateCount();sendState(conn);});
+  conn.on("close",()=>{conns.delete(conn);updateCount();});
+  conn.on("error",e=>{conns.delete(conn);updateCount();castErr("שגיאת רמקול: "+(e&&e.message||e));});
+ });
+ peer.on("disconnected",()=>{$("caststate").textContent="החיבור לשרת נותק. מתחברים מחדש…";
+  setTimeout(()=>{try{if(peer&&!peer.destroyed)peer.reconnect();}catch(e){castErr("התחברות מחדש נכשלה: "+(e&&e.message||e));}},1000);});
+ peer.on("error",e=>{
+  if(e&&e.type==="unavailable-id"&&castTries<4){castTries++;castErr("החדר תפוס, נפתח חדר חדש…");openPeer("hm"+crypto.randomUUID().replace(/-/g,"").slice(0,16));return;}
+  castErr("שגיאת חיבור רמקולים: "+(e&&e.message||e&&e.type||e));
+ });
+}
+async function startCast(){
+ $("cast").hidden=false;
+ try{await loadScript("https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js");
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js");
+ }catch(e){castErr("טעינת חיבור הרמקולים נכשלה. בדקו את האינטרנט.");return;}
+ if(typeof Peer!=="function"||typeof QRCode!=="function"){castErr("ספריית הרמקולים לא נטענה.");return;}
+ openPeer("hm"+crypto.randomUUID().replace(/-/g,"").slice(0,16));
+}
+$("localplay").addEventListener("change",()=>{
+ localOn=$("localplay").checked;if(!ac)return;const t=ac.currentTime;
+ for(const k of["R","L"]){hg[k].gain.cancelScheduledValues(t);
+  if(localOn)hg[k].gain.setTargetAtTime(sentVol[k]||0,t,.05);else hg[k].gain.setValueAtTime(0,t);
+  voices[k].forEach(vc=>{vc.g.gain.cancelScheduledValues(t);
+   if(localOn&&vc.on)vc.g.gain.setTargetAtTime(.25,t,.01);else vc.g.gain.setValueAtTime(0,t);});}
+});
 function fingers(h){const w=h[0],s=dist(w,h[9]);
  return TIPS.map((t,i)=>i===0?dist(h[4],h[17])>dist(h[3],h[17])*1.1&&dist(h[4],h[5])/s>.45:dist(h[t],w)>dist(h[PIPS[i]],w)*1.1);}
 function openness(h){const s=dist(h[0],h[9]);const sp=TIPS.reduce((a,k)=>a+dist(h[k],h[0]),0)/5/s;return Math.min(1,Math.max(0,(sp-.9)/1.0));}
@@ -87,7 +161,7 @@ btn.onclick=async()=>{
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error("הדפדפן חוסם מצלמה בהקשר הזה");
   v.srcObject=await navigator.mediaDevices.getUserMedia({video:{width:1280,height:960}});await v.play();
  }catch(e){return fail("אין גישה למצלמה",e,"אשר הרשאת מצלמה בסרגל הכתובת, וודא שאף אפליקציה אחרת לא משתמשת בה")}
- say("✅ פועל");$("overlay").style.display="none";loop();
+ say("✅ פועל");$("overlay").style.display="none";loop();startCast();
 };
 let last=-1;
 function loop(){
@@ -99,14 +173,21 @@ function loop(){
    const f=fingers(h);TIPS.forEach((t,j)=>du.drawLandmarks([h[t]],{color:f[j]?"#22c55e":"#ef4444",radius:9}));});
   if(seen.R&&seen.L){const s=(dist(seen.R[0],seen.R[9])+dist(seen.L[0],seen.L[9]))/2;
    const close=s>0&&dist(palm(seen.R),palm(seen.L))<s*CLAP_RATIO,nowMs=performance.now();
-   if(close&&!clapHeld&&nowMs-clapAt>=CLAP_MS){clapHeld=true;clapAt=nowMs;paused=!paused;if(paused)silence();showMode();}
+   if(close&&!clapHeld&&nowMs-clapAt>=CLAP_MS){clapHeld=true;clapAt=nowMs;paused=!paused;
+    if(paused){silence();broadcast({t:"pause"});broadcast({t:"stopAll"});}
+    else{sentVol.R=sentVol.L=null;broadcast({t:"resume"});}
+    showMode();}
    else if(!close)clapHeld=false;
   }
   const t=ac.currentTime;
   if(!paused){
   for(const k of["R","L"]){const h=seen[k],f=h?fingers(h):[0,0,0,0,0],op=h?openness(h):0;
-   hg[k].gain.setTargetAtTime(h?.15+.6*op:0,t,.05);$(k==="R"?"vr":"vl").textContent=h?"עוצמה "+Math.round(op*100)+"%":"עוצמה –";
-   voices[k].forEach((vc,j)=>{const on=!!f[j];if(on!==vc.on){vc.on=on;vc.g.gain.cancelScheduledValues(t);vc.g.gain.setTargetAtTime(on?.25:0,t,on?.01:.08);ui[k][j].className=on?"on":"";}});
+   const vol=h?.15+.6*op:0;if(localOn)hg[k].gain.setTargetAtTime(vol,t,.05);
+   $(k==="R"?"vr":"vl").textContent=h?"עוצמה "+Math.round(op*100)+"%":"עוצמה –";sendVol(k,vol);
+   voices[k].forEach((vc,j)=>{const on=!!f[j];if(on!==vc.on){vc.on=on;
+    if(localOn){vc.g.gain.cancelScheduledValues(t);vc.g.gain.setTargetAtTime(on?.25:0,t,on?.01:.08);}
+    ui[k][j].className=on?"on":"";
+    broadcast(on?{t:"noteOn",hand:k,i:j,freq:N[k][j][1],name:N[k][j][0]}:{t:"noteOff",hand:k,i:j,freq:N[k][j][1]});}});
   }
   }
  }
