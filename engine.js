@@ -511,6 +511,51 @@
         nextStepAc += stepDur();
       }
     }
+    const SONG_BPM = 152, SONG_INTRO = 1.6;
+    let songCursor = -1;
+    function fireSong(stepIndex, time, fingers) {
+      const step = 60 / SONG_BPM / 4;
+      const bar = Math.floor(stepIndex / 16) % 4;
+      const s = stepIndex % 16;
+      const root = [40, 36, 43, 38][bar];
+      const lead = [64, 67, 69, 71, 74];
+      if (fingers.R[0]) {
+        if (s % 4 === 0) hit("kick", 0.34, time, dest);
+        if (s === 4 || s === 12) hit("snare", 0.26, time, dest);
+        if (s % 2 === 0) hit("hat", 0.14, time, dest);
+      }
+      if (fingers.L[0] && s % 4 === 2) hit("ohat", 0.16, time, dest);
+      if (fingers.R[1] && s % 2 === 0) tone(dest, "sine", midi(root - 12), time, step * 1.7, 0.26, 0, 0.005);
+      if (fingers.L[1] && s % 4 === 2) tone(dest, "sine", midi(root), time, step * 1.2, 0.16, 0, 0.005);
+      if (fingers.R[2] && s % 4 === 0) {
+        tone(dest, "sawtooth", midi(root), time, step * 2.4, 0.1, 0, 0.008);
+        tone(dest, "sawtooth", midi(root + 7), time, step * 2.4, 0.08, 0, 0.008);
+        tone(dest, "sawtooth", midi(root + 12), time, step * 2.4, 0.07, 0, 0.008);
+      }
+      if (fingers.L[2] && s % 4 === 2) tone(dest, "sawtooth", midi(root + 12), time, step * 1.4, 0.07, 0, 0.006);
+      if (fingers.R[3] && (s === 2 || s === 6 || s === 10 || s === 14)) tone(dest, "square", midi(lead[(s / 2) % 5]), time, step * 1.3, 0.07, 0, 0.006);
+      if (fingers.L[3] && (s === 4 || s === 12)) tone(dest, "square", midi(lead[(bar + 2) % 5] + 12), time, step * 1.6, 0.06, 0, 0.006);
+      if (fingers.R[4] && s === 0) {
+        tone(dest, "sine", midi(root + 12), time, step * 14, 0.05, 0, 0.12);
+        tone(dest, "sine", midi(root + 19), time, step * 14, 0.04, 0, 0.14);
+      }
+      if (fingers.L[4] && s % 2 === 0) tone(dest, "sine", midi(lead[s % 5] + 24), time, step * 0.8, 0.05, midi(lead[0] + 12), 0.004);
+    }
+    function scheduleSong(songTime, fingers, acNow) {
+      if (!local) return;
+      const step = 60 / SONG_BPM / 4;
+      if (!(songTime >= SONG_INTRO)) { songCursor = -1; return; }
+      const maxIdx = Math.floor((songTime + 0.16 - SONG_INTRO) / step);
+      if (songCursor < 0 || songCursor > maxIdx + 1) songCursor = Math.floor((songTime - SONG_INTRO) / step);
+      let n = 0;
+      while (songCursor <= maxIdx && n++ < 8) {
+        const whenSong = SONG_INTRO + songCursor * step;
+        const whenAc = acNow + (whenSong - songTime);
+        if (whenAc > acNow - 0.04) fireSong(songCursor, Math.max(whenAc, acNow), fingers);
+        songCursor++;
+      }
+    }
+    function resetSong() { songCursor = -1; stopLive(); }
     function tick() {
       timer = setTimeout(tick, 25);
       if (!enabled) return;
@@ -566,11 +611,11 @@
     }
     return {
       layerOn: layerOn, triggerDrum: triggerDrum, setHand: setHand, setLayer: setLayer,
-      setEnabled: setEnabled, setLocal: setLocal, setArrangement: setArrangement, align: align, realign: realign, pump: pump, stopAll: stopAll, hit: hit
+      setEnabled: setEnabled, setLocal: setLocal, setArrangement: setArrangement, align: align, realign: realign, pump: pump, stopAll: stopAll, hit: hit, scheduleSong: scheduleSong, resetSong: resetSong
     };
   }
 
-  const api = { BPM: bpm, STEP: stepDur(), STEPS: STEPS, LOOP: loopDur(), DRUMS: DRUMS, BAND: BAND, ORCH: ORCH, risingHits: risingHits, createEngine: createEngine, setBpm: setBpm, masterFromPercent: masterFromPercent, makeLimiter: makeLimiter };
+  const api = { BPM: bpm, STEP: stepDur(), STEPS: STEPS, LOOP: loopDur(), DRUMS: DRUMS, BAND: BAND, ORCH: ORCH, SONG_BPM: 152, SONG_INTRO: 1.6, risingHits: risingHits, createEngine: createEngine, setBpm: setBpm, masterFromPercent: masterFromPercent, makeLimiter: makeLimiter };
   function syncApi() { api.BPM = bpm; api.STEP = stepDur(); api.LOOP = loopDur(); api.STEPS = STEPS; }
   syncApi();
   root.HM = api;

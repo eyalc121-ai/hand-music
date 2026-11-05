@@ -37,11 +37,12 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
 #castcount{font-size:18px;font-weight:700;color:#a5b4fc}
 #cast label{font-size:16px;cursor:pointer}
 #casterr{color:#f87171;min-height:1.2em;font-size:14px}
-#suno{width:min(640px,92vw);margin:8px 16px 28px;padding:14px 18px;background:#111827;border-radius:16px;text-align:center}
-#suno h2{margin:4px 0 8px}
-#suno p{color:#9ca3af;line-height:1.6;font-size:14px}
-#suno iframe{width:100%;height:240px;border:0;border-radius:12px;background:#000}
-#suno a{color:#7dd3fc}
+#songbox{width:min(640px,92vw);margin:8px 16px 28px;padding:14px 18px;background:#111827;border-radius:16px;text-align:center}
+#songbox[hidden]{display:none}
+#songbox h2{margin:4px 0 8px}
+#songbox p, #songbox summary{color:#9ca3af;line-height:1.6;font-size:14px}
+#songbox pre{white-space:pre-wrap;text-align:right;color:#e6e9f2;font-family:inherit;line-height:1.7}
+#songbox button{font-size:18px;padding:10px 22px}
 </style>
 </head>
 <body>
@@ -53,6 +54,7 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
   <button type="button" id="bd">🥁 תופים</button>
   <button type="button" id="bb">🎼 תזמורת</button>
   <button type="button" id="bo">🎻 פילהרמונית</button>
+  <button type="button" id="bs">🎵 מור ודודי</button>
 </div>
 <div id="mix">
 <label id="tempoBox">קצב <b id="tempoVal">122</b>
@@ -101,13 +103,37 @@ button{font-size:20px;padding:12px 36px;border:0;border-radius:999px;background:
 במצב «🎼 תזמורת» כל אצבע מוסיפה כלי לגרוב של 122 BPM (אפשר 118–124 במחוון), שמונה תיבות Am–F–C–G: קיק על כל רבע, היי-האט על כל שישה-עשר, סנייר על 2 ו-4, ומילוי כל ארבעה תיבות. ימין: קצב, בס, פסנתר, גיטרה, מיתרים. שמאל: ליד, חליל, מרימבה, נשיפה, מקהלה. סגירה מורידה את הכלי, ופתיחת כף היד קובעת את עוצמת היד. מחוון «עוצמה» (ברירת מחדל גבוהה) חל על המחשב ועל הרמקולים בטלפון. «תאורת טלפון» מדליקה את מסך הרמקול: לפי הקצב, צבע קבוע, או הבהוב. הפנס מהבהב לפי הקצב רק בכרום באנדרואיד. הבחירה נשמרת בדפדפן.<br>
 במצב «🎻 פילהרמונית» נפתח קטע תזמורתי נפרד, כ־96 BPM (מחוון 90–100), שמונה תיבות Dm–Bb–F–C. ימין: כינורות I, כינורות II, ויולות, צ'לי, קונטרבס בפיציקטו. שמאל: חליל, אבוב, קרנות, חצוצרות, נבל וטימפני. אולם הקונצרטים מהדהד יותר מהתזמורת.<br>
 מחאו כפיים — קרבו את מרכזי שתי כפות הידיים — כדי להשהות את הנגינה, ומחאו שוב כדי להמשיך.<br>
-אחרי «התחל» מופיע קוד QR לכתובת הרמקול בטלפון. «השמע גם במחשב» (פעיל כברירת מחדל) קובע אם התווים נשמעים גם כאן.</div>
-<section id="suno">
+אחרי «התחל» מופיע קוד QR לכתובת הרמקול בטלפון. «השמע גם במחשב» (פעיל כברירת מחדל) קובע אם התווים נשמעים גם כאן.<br>
+במצב «🎵 מור ודודי» השיר מתנגן דרך עוצמת האפליקציה. יש פתיח שקט של כשנייה וחצי, ואחר כך אצבע פתוחה מוסיפה ליווי רוק קל. פתיחת כף היד קובעת את עוצמת השיר, ומחיאת כפיים עוצרת וממשיכה. הרמקול בטלפון מנגן את אותו קובץ באותו מקום.</div>
+<section id="songbox" hidden>
   <h2>🎵 מור ודודי</h2>
-  <p>לשיר יש פתיח שקט לפני שהמוזיקה נכנסת.</p>
-  <iframe title="מור ודודי" src="https://suno.com/embed/b60cc97f-dcaa-459b-ad0a-f977dcb9e2d3" allow="autoplay; encrypted-media; fullscreen" loading="lazy"></iframe>
-  <p>הקובץ לא זמין להורדה: כתובות ה־CDN החזירו 403, והעותק הציבורי מקודד ולא מתנגן בדפדפן. לכן השיר נשאר בנגן של Suno, בלי חיבור לווליום של האפליקציה, לאצבעות, למחיאת כפיים או לרמקול בטלפון.</p>
-  <p><a href="https://suno.com/song/b60cc97f-dcaa-459b-ad0a-f977dcb9e2d3">לשיר ב־Suno</a></p>
+  <p>לשיר יש פתיח שקט של כשנייה וחצי לפני שהמוזיקה נכנסת. הליווי מתחיל אחרי הפתיח.</p>
+  <button type="button" id="songPlay">▶ נגן את השיר</button>
+  <details>
+    <summary>מילים</summary>
+    <pre>בית 1 (גבר):
+אורות של יום שישי, הסופ"ש כבר כאן
+מור שמה אודם, דודי על המזגן
+האוטו כבר מונע, הולכים לעוף באוויר
+לילה תל אביבי, נשרוף את כל העיר!
+
+בית 2 (אישה):
+דודי על ההגה, חיוך שלא נגמר
+מור מרימה כוסית, לא חושבים על המחר
+בבאר על הבר, במועדון או מול הים
+כשאנחנו ביחד – הרמקול מפוצץ ת'עולם!
+
+פזמון:
+מור ודודי, רוקנרול של החיים!
+רק התחלנו, והלילות עוד ארוכים!
+מסיבה שלא נפסקת, קצב בלתי עצור,
+מרימים ת'גג באוויר, זה הדיל הסגור!
+
+סולו גיטרה
+
+סיום: אז תרימו ת'כוסות! תן בראש, תגביר ת'ווליום!
+מור ודודי לנצח – החגיגה רק מתחילה!</pre>
+  </details>
 </section>
 <style>.keys{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap;justify-content:center}.keys div{width:76px;padding:10px 0;border-radius:10px;background:#1f2937;font-size:12px;line-height:1.25;transition:.1s}.keys div.on{background:#22c55e;color:#06210f;font-weight:bold;box-shadow:0 0 16px #22c55e}.keys div.hit{background:#f59e0b;color:#1c1003;font-weight:bold;box-shadow:0 0 16px #f59e0b}</style>
 <script src="engine.js"></script>
@@ -132,7 +158,9 @@ function pushLights(){try{localStorage.setItem("handmusic-lights",JSON.stringify
 try{const savedMaster=parseInt(localStorage.getItem("handmusic-master"),10);if(savedMaster>=0&&savedMaster<=100)masterPct=savedMaster;}catch(e){}
 function masterLevel(){return typeof HM!=="undefined"&&HM.masterFromPercent?HM.masterFromPercent(masterPct):(Math.max(0,Math.min(100,masterPct))/100)*1.85;}
 function palmVol(h,op){return h?Math.min(1.45,0.72+0.73*op):0;}
-const MODES=["notes","drums","band","orch"];
+const MODES=["notes","drums","band","orch","song"];
+const SONG_URL="songs/mor-vedudi.mp3";
+const SONG_NAMES={R:["🥁 קצב","🎸 בס","🎸 פאוור","🎸 ליד","🌊 פאד"],L:["🥁 היי-הט","🎸 בס גבוה","🎸 אקורד","🎸 ליד ב","✨ ניצוץ"]};
 function isGroove(m){return m==="band"||m==="orch";}
 let playMode="notes";
 try{const saved=localStorage.getItem("handmusic-mode");if(MODES.includes(saved))playMode=saved;}catch(e){}
@@ -152,7 +180,8 @@ function audio(){ac=new AudioContext();master=ac.createGain();master.gain.value=
  engine=HM.createEngine(ac,master,loopPos);
  if(engine.setArrangement)engine.setArrangement(playMode==="orch"?"orch":"band");
  if(isGroove(playMode))engine.setEnabled(true);
- setInterval(()=>{if(isGroove(playMode))broadcastSync();},2000);
+ setInterval(()=>{if(isGroove(playMode))broadcastSync();if(playMode==="song")broadcastSong();},2000);
+ setInterval(songTick,40);
 }
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const palm=h=>({x:(h[0].x+h[9].x)/2,y:(h[0].y+h[9].y)/2});
@@ -185,10 +214,12 @@ function sendState(conn){
   conn.send({t:paused?"pause":"resume"});
   conn.send({t:"mode",mode:playMode});
   conn.send(lightsPayload());
+  if(playMode==="song")conn.send(songPayload());
   if(paused){conn.send({t:"stopAll"});return;}
   for(const k of["R","L"]){if(sentVol[k]!=null)conn.send({t:"vol",hand:k,v:sentVol[k]});
    if(playMode==="notes")voices[k].forEach((vc,j)=>{if(vc.on)conn.send({t:"noteOn",hand:k,i:j,freq:N[k][j][1],name:N[k][j][0]});});
-   if(isGroove(playMode)&&engine)for(let j=0;j<5;j++)if(engine.layerOn[k][j])conn.send({t:"layer",hand:k,i:j,on:1,name:(playMode==="orch"?HM.ORCH:HM.BAND)[k][j]});}
+   if(isGroove(playMode)&&engine)for(let j=0;j<5;j++)if(engine.layerOn[k][j])conn.send({t:"layer",hand:k,i:j,on:1,name:(playMode==="orch"?HM.ORCH:HM.BAND)[k][j]});
+   if(playMode==="song")for(let j=0;j<5;j++)if(songOn[k][j])conn.send({t:"layer",hand:k,i:j,on:1,name:SONG_NAMES[k][j]});}
  }catch(e){castErr("שליחת המצב לרמקול נכשלה: "+(e&&e.message||e));}
 }
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=()=>res();s.onerror=()=>rej(new Error(src));document.head.appendChild(s);});}
@@ -268,12 +299,13 @@ function loop(){
   if(seen.R&&seen.L){const s=(dist(seen.R[0],seen.R[9])+dist(seen.L[0],seen.L[9]))/2;
    const close=s>0&&dist(palm(seen.R),palm(seen.L))<s*CLAP_RATIO,nowMs=performance.now();
    if(close&&!clapHeld&&nowMs-clapAt>=CLAP_MS){clapHeld=true;clapAt=nowMs;paused=!paused;
-    if(paused){pauseClock();silence();broadcast({t:"pause"});broadcast({t:"stopAll"});}
-    else{resumeClock();sentVol.R=sentVol.L=null;if(engine&&isGroove(playMode))engine.setEnabled(true);broadcast({t:"resume"});broadcastSync();}
+    if(paused){pauseClock();silence();if(playMode==="song"&&songEl&&songStarted)songEl.pause();broadcast({t:"pause"});broadcast({t:"stopAll"});if(playMode==="song")broadcastSong();}
+    else{resumeClock();sentVol.R=sentVol.L=null;if(engine&&isGroove(playMode))engine.setEnabled(true);if(playMode==="song"&&songEl&&songStarted){songEl.play().catch(()=>{});if(engine&&engine.resetSong)engine.resetSong();}broadcast({t:"resume"});broadcastSync();if(playMode==="song")broadcastSong();}
     showMode();}
    else if(!close)clapHeld=false;
   }
   const t=ac.currentTime,hitNow=performance.now();
+  const songOps=[];
   for(const k of["R","L"]){const h=seen[k],f=h?fingers(h):[0,0,0,0,0],op=h?openness(h):0;
    if(!paused)$(k==="R"?"vr":"vl").textContent=h?"עוצמה "+Math.round(op*100)+"%":"עוצמה –";
    if(!paused&&playMode==="notes"){const vol=palmVol(h,op);if(localOn)hg[k].gain.setTargetAtTime(vol,t,.05);sendVol(k,vol);
@@ -285,12 +317,17 @@ function loop(){
     for(const j of HM.risingHits(held[k],f,drumAt[k],hitNow,120)){drumAt[k][j]=hitNow;
      if(localOn&&engine)engine.triggerDrum(k,j,hv);flash(ui[k][j]);
      broadcast({t:"drum",hand:k,i:j,vol:hv,name:HM.DRUMS[k][j]});}}
+   else if(!paused&&playMode==="song"){if(h)songOps.push(op);
+    for(let j=0;j<5;j++){const on=!!f[j];if((songOn[k][j]?1:0)!==(on?1:0)){songOn[k][j]=on?1:0;ui[k][j].className=on?"on":"";broadcast({t:"layer",hand:k,i:j,on:on?1:0,name:SONG_NAMES[k][j]});}}}
    else if(!paused&&isGroove(playMode)&&engine){const vol=palmVol(h,op);engine.setHand(k,localOn?vol:0);sendVol(k,vol);
     const names=playMode==="orch"?HM.ORCH:HM.BAND;
     for(let j=0;j<5;j++){const on=!!f[j];if((engine.layerOn[k][j]?1:0)!==(on?1:0)){engine.setLayer(k,j,on);
      ui[k][j].className=on?"on":"";broadcast({t:"layer",hand:k,i:j,on:on?1:0,name:names[k][j]});}}}
    for(let j=0;j<5;j++)held[k][j]=f[j]?1:0;
   }
+  if(!paused&&playMode==="song"&&songGain){const op=songOps.length?songOps.reduce((a,b)=>a+b,0)/songOps.length:0;
+   const vol=songOps.length?Math.min(1.45,0.72+0.73*op):0;songVol=vol;const g=localOn?vol:0;
+   songGain.gain.cancelScheduledValues(t);songGain.gain.setTargetAtTime(g,t,.05);sendSongGain(vol);}
   primed=true;
  }
  requestAnimationFrame(loop);
@@ -298,14 +335,17 @@ function loop(){
 const held={R:[0,0,0,0,0],L:[0,0,0,0,0]},drumAt={R:[0,0,0,0,0],L:[0,0,0,0,0]};
 let primed=false;
 function flash(el){el.classList.add("hit");setTimeout(()=>el.classList.remove("hit"),140);}
-function labelFor(k,i){if(typeof HM==="undefined")return N[k][i][0];if(playMode==="drums")return HM.DRUMS[k][i];if(playMode==="band")return HM.BAND[k][i];if(playMode==="orch")return HM.ORCH[k][i];return N[k][i][0];}
+function labelFor(k,i){if(playMode==="song")return SONG_NAMES[k][i];if(typeof HM==="undefined")return N[k][i][0];if(playMode==="drums")return HM.DRUMS[k][i];if(playMode==="band")return HM.BAND[k][i];if(playMode==="orch")return HM.ORCH[k][i];return N[k][i][0];}
 function applyLabels(){for(const k of["R","L"])ui[k].forEach((el,i)=>{el.innerHTML=FING[i]+"<br>"+labelFor(k,i);el.className="";});
- $("bn").classList.toggle("on",playMode==="notes");$("bd").classList.toggle("on",playMode==="drums");$("bb").classList.toggle("on",playMode==="band");$("bo").classList.toggle("on",playMode==="orch");}
-function setPlayMode(m){if(!MODES.includes(m)||m===playMode)return;playMode=m;
+ $("bn").classList.toggle("on",playMode==="notes");$("bd").classList.toggle("on",playMode==="drums");$("bb").classList.toggle("on",playMode==="band");$("bo").classList.toggle("on",playMode==="orch");
+ const bs=$("bs");if(bs)bs.classList.toggle("on",playMode==="song");
+ const box=$("songbox");if(box)box.hidden=playMode!=="song";}
+function setPlayMode(m){if(!MODES.includes(m)||m===playMode)return;const prev=playMode;playMode=m;
  try{localStorage.setItem("handmusic-mode",m);}catch(e){}
- applyTempoUi();
- if(ac){silence();if(engine&&engine.setArrangement)engine.setArrangement(m==="orch"?"orch":"band");broadcast({t:"stopAll"});broadcast({t:"mode",mode:m});if(isGroove(m)&&engine&&!paused){engine.setEnabled(true);broadcastSync();}}
- else if(typeof HM==="undefined"&&m!=="notes")castErr("מנוע הצליל לא נטען. רעננו את הדף.");
+ if(prev==="song")stopSongPlayback();
+ if(m!=="song")applyTempoUi();
+ if(ac){silence();if(engine&&engine.setArrangement)engine.setArrangement(m==="orch"?"orch":"band");broadcast({t:"stopAll"});broadcast({t:"mode",mode:m});if(isGroove(m)&&engine&&!paused){engine.setEnabled(true);broadcastSync();}if(m==="song")broadcastSong();}
+ else if(typeof HM==="undefined"&&m!=="notes"&&m!=="song")castErr("מנוע הצליל לא נטען. רעננו את הדף.");
  applyLabels();}
 function tempoBounds(){return playMode==="orch"?{min:90,max:100,key:"handmusic-orch-bpm",fallback:96}:{min:118,max:124,key:"handmusic-bpm",fallback:122};}
 function applyTempoUi(){const b=tempoBounds();let n=b.fallback;
@@ -345,5 +385,27 @@ $("bn").onclick=()=>setPlayMode("notes");
 $("bd").onclick=()=>setPlayMode("drums");
 $("bb").onclick=()=>setPlayMode("band");
 $("bo").onclick=()=>setPlayMode("orch");
+$("bs").onclick=()=>setPlayMode("song");
+let songEl=null,songSrc=null,songGain=null,songStarted=false;
+const songOn={R:[0,0,0,0,0],L:[0,0,0,0,0]};
+let songGainSent=null,songGainAt=0,songVol=0;
+function songAbs(){return new URL(SONG_URL,location.href).href;}
+function songPayload(){return {t:"song",url:songAbs(),time:songEl?songEl.currentTime:0,paused:paused?1:0,playing:songStarted?1:0,g:songVol};}
+function broadcastSong(){if(typeof broadcast==="function")broadcast(songPayload());}
+function sendSongGain(v){const q=Math.round(v*50)/50,now=performance.now();if(songGainSent===q)return;if(q!==0&&now-songGainAt<50)return;songGainSent=q;songGainAt=now;broadcast({t:"songGain",v:q});}
+function setupSong(){if(songEl||!ac)return;songEl=new Audio(SONG_URL);songEl.preload="auto";songEl.crossOrigin="anonymous";
+ songSrc=ac.createMediaElementSource(songEl);songGain=ac.createGain();songGain.gain.value=0;songSrc.connect(songGain);songGain.connect(master);
+ songEl.onended=()=>{songStarted=false;if($("songPlay"))$("songPlay").textContent="▶ נגן את השיר";broadcastSong();};
+ songEl.onplay=()=>{if($("songPlay"))$("songPlay").textContent="⏸ עצור את השיר";};
+ songEl.onpause=()=>{if(!songStarted&&$("songPlay"))$("songPlay").textContent="▶ נגן את השיר";};}
+function songTick(){if(playMode!=="song"||!songStarted||paused||!songEl||songEl.paused||!engine||!engine.scheduleSong||!ac)return;
+ engine.scheduleSong(songEl.currentTime,songOn,ac.currentTime);}
+async function toggleSong(){if(!ac){const s=$("status");if(s)s.textContent="קודם לחצו «התחל» כדי להפעיל שמע.";return;}
+ setupSong();
+ if(songEl.paused){songStarted=true;paused=false;showMode();if(engine&&engine.resetSong)engine.resetSong();try{await songEl.play();}catch(e){songStarted=false;castErr("ניגון השיר נכשל: "+(e&&e.message||e));return;}}
+ else{songStarted=false;songEl.pause();if(engine&&engine.resetSong)engine.resetSong();}
+ broadcastSong();}
+function stopSongPlayback(){songStarted=false;if(songEl)songEl.pause();if(engine&&engine.resetSong)engine.resetSong();for(const k of ["R","L"])songOn[k]=[0,0,0,0,0];if($("songPlay"))$("songPlay").textContent="▶ נגן את השיר";broadcastSong();}
+if($("songPlay"))$("songPlay").onclick=()=>{toggleSong();};
 </script>
 </body></html>

@@ -89,6 +89,21 @@ function audio(){
  if(typeof HM==="undefined")throw new Error("מנוע הצליל לא נטען");
  engine=HM.createEngine(ac,masterGain,groovePos);
 }
+let songEl=null,songSrc=null,songGain=null,songAn=null,songBuf=null,songStarted=false,songTimer=null;
+function sampleSong(){if(!songAn||!songBuf||!songEl||songEl.paused)return 0;songAn.getByteTimeDomainData(songBuf);
+ let s=0;for(let i=0;i<songBuf.length;i++){const x=(songBuf[i]-128)/128;s+=x*x;}return Math.sqrt(s/songBuf.length);}
+function ensureSong(url){if(!ac)throw new Error("השמע עוד לא הופעל");
+ if(!songEl){songEl=new Audio();songEl.crossOrigin="anonymous";songEl.preload="auto";
+  songSrc=ac.createMediaElementSource(songEl);songGain=ac.createGain();songGain.gain.value=0;
+  songAn=ac.createAnalyser();songAn.fftSize=256;songBuf=new Uint8Array(songAn.fftSize);
+  songSrc.connect(songGain);songGain.connect(songAn);songAn.connect(masterGain);
+  songTimer=setInterval(()=>{if(remoteMode==="song"&&songStarted&&!remotePaused&&songEl&&!songEl.paused&&engine&&engine.scheduleSong)engine.scheduleSong(songEl.currentTime,bandOn,ac.currentTime);},40);}
+ if(songEl.getAttribute("data-src")!==url){songEl.src=url;songEl.setAttribute("data-src",url);}}
+function applySong(d){if(!d.url)throw new Error("חסר קישור לשיר");ensureSong(d.url);
+ const target=Number(d.time)||0,drift=Math.abs((songEl.currentTime||0)-target);
+ if(d.g!=null&&Number.isFinite(Number(d.g))){songGain.gain.cancelScheduledValues(ac.currentTime);songGain.gain.setTargetAtTime(Math.max(0,Number(d.g)),ac.currentTime,.05);}
+ if(d.playing&&!d.paused){songStarted=true;if(drift>0.3)songEl.currentTime=Math.max(0,target);if(songEl.paused)songEl.play().catch(e=>showErr("ניגון השיר בטלפון נכשל: "+(e&&e.message||e)));}
+ else{if(drift>0.3)songEl.currentTime=Math.max(0,target);songEl.pause();if(!d.playing)songStarted=false;if(engine&&engine.resetSong)engine.resetSong();}}
 function stopAll(){
  if(!ac)return;
  const t=ac.currentTime;
@@ -105,18 +120,22 @@ function applyMsg(d){
  if(typeof d==="string")d=JSON.parse(d);
  if(!d||typeof d!=="object")throw new Error("הודעה לא תקינה מהמחשב");
  if(!ac)throw new Error("השמע עוד לא הופעל");
- if(d.t==="pause"){remotePaused=true;holdPos=groovePos();stopAll();return;}
+ if(d.t==="pause"){remotePaused=true;holdPos=groovePos();stopAll();if(songEl)songEl.pause();return;}
  if(d.t==="resume"){remotePaused=false;const t=ac.currentTime;
   for(const k of ["R","L"]){hg[k].gain.cancelScheduledValues(t);hg[k].gain.setTargetAtTime(volStore[k],t,.05);if(engine)engine.setHand(k,volStore[k]);}
-  if((remoteMode==="band"||remoteMode==="orch")&&engine)engine.setEnabled(true);return;}
+  if((remoteMode==="band"||remoteMode==="orch")&&engine)engine.setEnabled(true);
+  if(remoteMode==="song"&&songEl&&songStarted){songEl.play().catch(()=>{});}return;}
  if(d.t==="stopAll"){stopAll();return;}
  if(d.t==="master"){if(!Number.isFinite(Number(d.v)))throw new Error("עוצמה לא תקינה");applyMaster(d.v);return;}
  if(d.t==="sync"){takeClock(d,false);return;}
  if(d.t==="pong"){takeClock(d,Date.now()-d.t);return;}
- if(d.t==="mode"){if(d.mode!=="notes"&&d.mode!=="drums"&&d.mode!=="band"&&d.mode!=="orch")throw new Error("מצב לא מוכר");
+ if(d.t==="song"){applySong(d);return;}
+ if(d.t==="songGain"){if(!Number.isFinite(Number(d.v)))throw new Error("עוצמת שיר לא תקינה");if(songGain){songGain.gain.cancelScheduledValues(ac.currentTime);songGain.gain.setTargetAtTime(Math.max(0,Number(d.v)),ac.currentTime,.05);}return;}
+ if(d.t==="mode"){if(d.mode!=="notes"&&d.mode!=="drums"&&d.mode!=="band"&&d.mode!=="orch"&&d.mode!=="song")throw new Error("מצב לא מוכר");
   remoteMode=d.mode;
   const groove=remoteMode==="band"||remoteMode==="orch";
-  if(!groove){bandOn.R=[0,0,0,0,0];bandOn.L=[0,0,0,0,0];if(engine)engine.stopAll();}
+  if(remoteMode==="song"){if(engine)engine.setEnabled(false);}
+  else if(!groove){bandOn.R=[0,0,0,0,0];bandOn.L=[0,0,0,0,0];if(engine)engine.stopAll();if(songEl){songEl.pause();songStarted=false;}}
   else {if(engine&&engine.setArrangement)engine.setArrangement(remoteMode==="orch"?"orch":"band");if(!remotePaused&&engine)engine.setEnabled(true);}
   renderNotes();return;}
  if(d.t==="layer"){const k=d.hand,i=d.i|0;if((k!=="R"&&k!=="L")||i<0||i>4)throw new Error("שכבת כלים לא תקינה");
@@ -202,15 +221,17 @@ function beatInfo(){if(!origin||typeof HM==="undefined"||!HM.STEP)return {phase:
 function activeRgbs(now){const cols=[];
  for(const k of ["R","L"])for(let j=0;j<5;j++){
   const note=remoteMode==="notes"&&voices&&voices[k]&&voices[k][j].on;
-  const layer=(remoteMode==="band"||remoteMode==="orch")&&bandOn[k][j];
+  const layer=(remoteMode==="band"||remoteMode==="orch"||remoteMode==="song")&&bandOn[k][j];
   if(note||layer||drumGlow[k][j]>now)cols.push(COLORS[k][j]);
  }return cols;}
 function paintLights(now){const el=$("light");if(!lights.on){el.classList.remove("on");return;}
  el.classList.add("on");
- const info=beatInfo();
+ let info=beatInfo();
+ if(remoteMode==="song"&&songEl){const beat=60/152,st=Math.max(0,songEl.currentTime-1.6),phase=(st%beat)/beat,six=beat/4,idx=Math.floor(st/six);
+  info={phase:phase,into:(st%six)/six,s:((idx%16)+16)%16,bar:Math.floor(idx/16)%8,idx:idx};}
  if(remoteMode==="band"&&bandOn.R[0]&&(info.bar===0||info.bar===4)&&info.s===0&&info.into<0.35&&info.idx!==lastCrash){lastCrash=info.idx;whiteUntil=now+180;}
  const pulse=Math.pow(Math.max(0,1-info.phase*3.2),1.7);
- const vol=Math.max(volStore.R||0,volStore.L||0,0.35)/1.45;
+ const vol=remoteMode==="song"?Math.max(0.2,Math.min(1,sampleSong()*3.2)):Math.max(volStore.R||0,volStore.L||0,0.35)/1.45;
  const master=Math.max(0.15,masterPct/100);
  let level=0.9;
  if(remotePaused)level=0.18;
